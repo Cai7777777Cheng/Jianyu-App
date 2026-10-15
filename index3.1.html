@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>间语 · 小间</title>
+  <link rel="stylesheet" href="styles3.1.css" />
+</head>
+<body>
+  <div class="stage">
+    <p class="stage-hint">间语 3.1 · 双击打开<br />首页直接跟小间说。底栏只有三栏。</p>
+    <div class="phone" id="phone">
+      <header class="status">
+        <time id="clock">9:41</time>
+        <span class="island" aria-hidden="true"></span>
+        <span class="status-icons" aria-hidden="true">
+          <svg viewBox="0 0 18 12" width="17" height="12"><rect x="0" y="7" width="3" height="5" rx="0.6"/><rect x="5" y="4.5" width="3" height="7.5" rx="0.6"/><rect x="10" y="2" width="3" height="10" rx="0.6"/><rect x="15" y="0" width="3" height="12" rx="0.6"/></svg>
+          <svg viewBox="0 0 16 12" width="15" height="12" fill="none" stroke="#141414" stroke-width="1.6" stroke-linecap="round"><path d="M1 4.6c3.2-2.6 10.8-2.6 14 0"/><path d="M3.5 7.2c2.2-1.7 6.8-1.7 9 0"/></svg>
+          <svg viewBox="0 0 25 12" width="24" height="12"><rect x="0.7" y="0.7" width="20" height="10.6" rx="2.2" fill="none" stroke="#141414" stroke-width="1.3"/><rect x="2.4" y="2.4" width="15" height="7.2" rx="1"/><path d="M23 4.2v3.6" stroke="#141414" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </span>
+      </header>
+
+      <div class="app">
+        <section class="screen on" id="view-home">
+          <div class="home">
+            <div class="home-top">
+              <div>
+                <h1 class="greet" id="greet">晚上好，阿宁</h1>
+                <p class="greet-sub">想说就在这儿说。</p>
+              </div>
+              <div class="streak" aria-label="小间陪了 7 天">
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="#ff7a1a" d="M12 2s2 3 2 5.2c0 1.2-.6 2-1.2 2.4.8-.2 2.2-.2 2.2 1.6 0 2.6-2.2 4.8-5 4.8s-5-2-5-4.6C5 7.6 8.2 4.2 12 2z"/></svg>
+                <b>7</b>
+              </div>
+            </div>
+            <div class="hero-zone">
+              <div class="float" id="hero-float">
+                <div class="sway" id="hero-sway">
+                  <img id="hero-img" alt="小间" src="assets/xiaojian/calm.png" />
+                </div>
+              </div>
+              <p class="hero-name" id="hero-name">平静</p>
+            </div>
+            <div class="bubbles" id="bubbles" aria-live="polite"></div>
+            <form class="dock" id="dock">
+              <button class="mic" id="mic" type="button" aria-label="说话" aria-pressed="false">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4"/></svg>
+              </button>
+              <input id="say" type="text" placeholder="跟小间说说" autocomplete="off" enterkeyhint="send" />
+              <button class="send" type="submit" aria-label="发送">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V6M6.5 11.5 12 6l5.5 5.5"/></svg>
+              </button>
+            </form>
+          </div>
+        </section>
+
+        <section class="screen" id="view-hub">
+          <div class="scroll">
+            <h1 class="page-title">交流</h1>
+            <p class="page-sub">同一件事，选一块说出去。</p>
+            <div class="bento">
+              <button class="tile tile-tree" type="button" data-open="tree">
+                <span class="kicker">私密</span>
+                <span class="tile-title">树洞</span>
+                <span class="tile-desc">说给小间听<br />默认不转给对方</span>
+              </button>
+              <button class="tile tile-note" type="button" data-open="letters">
+                <span class="kicker">信件</span>
+                <span class="tile-title">信札</span>
+                <span class="tile-desc">短笺与回应</span>
+              </button>
+              <button class="tile tile-voice" type="button" data-open="composer">
+                <span class="kicker">整理</span>
+                <span class="tile-title">语音 / 短笺</span>
+                <span class="tile-desc">收成一句需求</span>
+              </button>
+            </div>
+            <div class="careful"><span>慎重通道</span></div>
+            <button class="tile tile-phone" type="button" data-open="phone">
+              <span class="kicker">需当次确认</span>
+              <span class="tile-title">电话</span>
+              <span class="tile-desc">小间用自己的身份打。未接就改短笺，不连着打。</span>
+            </button>
+          </div>
+        </section>
+
+        <section class="screen" id="view-me">
+          <div class="scroll">
+            <h1 class="page-title">我的</h1>
+            <p class="page-sub">点一只，首页的小间就换成这一只。</p>
+            <div class="temper-grid" id="temper-grid">
+              <button class="temper" type="button" data-pick="calm"><img src="assets/xiaojian/calm.png" alt="" /><em>平静</em></button>
+              <button class="temper" type="button" data-pick="soft"><img src="assets/xiaojian/soft.png" alt="" /><em>软萌</em></button>
+              <button class="temper" type="button" data-pick="listen"><img src="assets/xiaojian/listen.png" alt="" /><em>倾听</em></button>
+              <button class="temper" type="button" data-pick="empathy"><img src="assets/xiaojian/empathy.png" alt="" /><em>共情</em></button>
+              <button class="temper" type="button" data-pick="cheer"><img src="assets/xiaojian/cheer.png" alt="" /><em>鼓励</em></button>
+              <button class="temper" type="button" data-pick="low"><img src="assets/xiaojian/low.png" alt="" /><em>低落</em></button>
+            </div>
+            <div class="sec">设置</div>
+            <div class="set-card">
+              <button class="set-row" type="button" data-act="pick-name">
+                <span><b>怎么称呼你</b><small>只影响小间怎么叫你</small></span>
+                <span class="set-val" id="name-val">阿宁</span>
+              </button>
+              <button class="set-row" type="button" data-act="cycle-freq">
+                <span><b>主动开口</b><small>还是要你自己接话</small></span>
+                <span class="set-val" id="freq-val">刚好就好</span>
+              </button>
+              <button class="set-row" type="button" data-act="pause">
+                <span><b>暂停主动找我</b><small>首页仍然可以说话</small></span>
+                <span class="switch" id="pause-switch"><i></i></span>
+              </button>
+            </div>
+            <div class="sec">微信</div>
+            <div class="wx">
+              <h3>微信里的小间</h3>
+              <ul>
+                <li>聊天框里可以说，话回到首页和树洞。</li>
+                <li>短笺要在这里预览确认，电话要每次点头。</li>
+                <li>小间只用自己的名字，不会装成你的伴侣。</li>
+              </ul>
+              <p class="note">这是说明。这个 Demo 不连接微信。</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="screen" id="view-tree">
+          <header class="subhead">
+            <button class="back" type="button" data-back aria-label="返回"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M15 5 8 12l7 7"/></svg></button>
+            <div class="subhead-text"><h1>树洞</h1><p id="tree-sub">完整记录留在这里</p></div>
+            <button class="vent" type="button" data-act="vent"><span class="switch" id="vent-switch"><i></i></span><span>只倒苦水</span></button>
+          </header>
+          <div class="chat-log" id="tree-log"></div>
+          <form class="dock slim" id="tree-form">
+            <input id="tree-say" type="text" placeholder="继续说给小间" autocomplete="off" />
+            <button class="send" type="submit" aria-label="发送"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M12 19V6M6.5 11.5 12 6l5.5 5.5"/></svg></button>
+          </form>
+        </section>
+
+        <section class="screen" id="view-letters">
+          <header class="subhead">
+            <button class="back" type="button" data-back aria-label="返回"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M15 5 8 12l7 7"/></svg></button>
+            <div class="subhead-text"><h1>信札</h1><p>对方看到的是短笺，不是原话</p></div>
+          </header>
+          <div class="scroll tight">
+            <div class="seg" id="seg">
+              <button type="button" class="on" data-box="in">收到</button>
+              <button type="button" data-box="out">发出</button>
+            </div>
+            <div id="note-list"></div>
+          </div>
+        </section>
+
+        <section class="screen" id="view-composer">
+          <header class="subhead">
+            <button class="back" type="button" data-back aria-label="返回"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M15 5 8 12l7 7"/></svg></button>
+            <div class="subhead-text"><h1>语音 / 短笺</h1><p>确认之后才发出</p></div>
+          </header>
+          <div class="scroll tight">
+            <label class="field"><span>感受</span><input id="field-feel" type="text" placeholder="我有点闷" /></label>
+            <label class="field"><span>当时</span><input id="field-when" type="text" placeholder="你回得慢的时候" /></label>
+            <label class="field"><span>希望对方</span><input id="field-need" type="text" placeholder="先回我一句「晚点聊」" /></label>
+            <button class="voice-btn" type="button" id="voice-btn" data-act="voice">说一句（示意）</button>
+            <div class="preview" id="preview"><div class="plabel">对方将看到</div><p id="preview-text"></p><p class="warn">这是整理后的需求，不是原话。点下面才会发出。</p></div>
+            <button class="cta" type="button" data-act="preview-note">预览这句</button>
+            <button class="cta" type="button" id="btn-send-note" data-act="send-note" disabled>确认转达</button>
+          </div>
+        </section>
+
+        <section class="screen" id="view-call">
+          <header class="subhead">
+            <button class="back" type="button" data-back aria-label="返回"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M15 5 8 12l7 7"/></svg></button>
+            <div class="subhead-text"><h1>小间来电</h1><p>我是小间，不是对方本人</p></div>
+          </header>
+          <div class="call-body">
+            <div class="call-flag"><span class="live"></span><span id="call-flag-text">通话中</span></div>
+            <img class="call-face" id="call-img" alt="" src="assets/xiaojian/calm.png" />
+            <div class="script"><span>小间正在说</span><p id="call-script"></p></div>
+            <div class="call-time" id="call-time">00:00</div>
+            <div class="call-actions">
+              <button type="button" data-act="hangup"><span class="round dark">挂</span><span>挂断</span></button>
+              <button type="button" data-act="missed"><span class="round line">未</span><span>对方未接</span></button>
+            </div>
+          </div>
+        </section>
+
+        <nav class="tabbar" id="tabbar" role="tablist">
+          <button class="tab on" type="button" data-tab="home" role="tab" aria-selected="true">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1z"/></svg>
+            首页
+          </button>
+          <button class="tab" type="button" data-tab="hub" role="tab">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/></svg>
+            交流
+          </button>
+          <button class="tab" type="button" data-tab="me" role="tab">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 19.2c1.2-3 3.5-4.5 6.5-4.5s5.3 1.5 6.5 4.5"/></svg>
+            我的
+          </button>
+        </nav>
+
+        <div class="sheet" id="sheet">
+          <div class="sheet-dim" data-close></div>
+          <div class="sheet-panel" role="dialog" aria-modal="true"><div class="grab"></div><div id="sheet-body"></div></div>
+        </div>
+        <div class="toast" id="toast" role="status"></div>
+      </div>
+    </div>
+  </div>
+  <script src="app3.1.js"></script>
+</body>
+</html>
