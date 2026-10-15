@@ -12,7 +12,7 @@ npm run dev
 
 浏览器打开终端里的地址，默认 http://127.0.0.1:5173 。生产构建是 `npm run build`。
 
-同一套界面的离线页是根目录 `index4.0.html`，双击即可（`file://`），不经过 Vite。
+同一套界面的离线页是根目录 `index4.1.html`，双击即可（`file://`），不经过 Vite。交流插画在 `channels/`。
 
 ## 静态 Demo
 
@@ -38,7 +38,8 @@ python3 -m http.server 8765
 | 文件 | 说明 |
 |------|------|
 | `apps/jianyu-web/` | Vite + React 原型，`npm i && npm run dev` |
-| `index4.0.html` | 与 Vite 同一套界面的离线页（`styles4.0.css`、`app4.0.js`） |
+| `index4.1.html` | 与当前 Vite 同一套界面的离线页（`styles4.1.css`、`app4.1.js`、`channels/`） |
+| `index4.0.html` | 4.0 离线页，没有交流插画 |
 | `index3.1.html` | 3.1：PNG 小间，三栏，首页原地说话 |
 | `index.html` | 单页结构（手机框 + 五栏 + 浮层） |
 | `styles.css` | 温暖平静视觉 |

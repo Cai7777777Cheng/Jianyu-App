@@ -16,4 +16,4 @@ npm run dev
 npm run build
 ```
 
-离线静态对照页在仓库根目录的 `index4.0.html`，双击即可，不经过 Vite。
+离线静态对照页在仓库根目录的 `index4.1.html`，双击即可，不经过 Vite。交流插画在仓库根的 `channels/`。
