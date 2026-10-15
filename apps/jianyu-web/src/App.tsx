@@ -15,6 +15,7 @@ import {
   NAMES,
   PARTNER,
   SEED_LETTERS,
+  SEED_TREE,
   SOFT_REPLIES,
   STATE_LABEL,
   callScript,
@@ -50,7 +51,7 @@ type View =
   | "together"
   | "voice";
 type Tab = "home" | "hub" | "cal" | "me";
-type Msg = { id: number; role: "me" | "bot"; text: string; tint: string };
+type Msg = { id: number; day: number; role: "me" | "bot"; text: string; tint: string };
 type Channel = "letter" | "call";
 type Lens = "ning" | "zhou";
 type Sheet =
@@ -320,7 +321,7 @@ export default function App() {
 
   function pushLine(role: "me" | "bot", text: string, tint: string) {
     const id = msgId.current++;
-    setMessages((list) => [...list, { id, role, text, tint }]);
+    setMessages((list) => [...list, { id, day: DEMO_TODAY, role, text, tint }]);
   }
 
   function speak(text: string) {
@@ -380,7 +381,7 @@ export default function App() {
     const letter: Letter = {
       id,
       box: "out",
-      who: "小间 · 代我转达",
+      who: "小间",
       body: relayText(source, nameRef.current),
       status: reply ? "已回应" : status,
       meta,
@@ -434,7 +435,7 @@ export default function App() {
     }
     if (channel === "letter") {
       deliver(card, "待看", "短笺 · 小周还没回", "");
-      ping("已放进小周的信札。对方看到的是这三句，不是原话。");
+      ping("已放进小周的信札。送出去的是这三句。");
       return;
     }
     setStack((s) => [...s, "preview"]);
@@ -528,6 +529,18 @@ export default function App() {
 
   const cells: Array<number | null> = [...Array.from({ length: CAL_LEAD }, () => null), ...Array.from({ length: CAL_DAYS }, (_, i) => i + 1)];
   const dayNote = (day: number) => days.find((d) => d.day === day);
+  const treeLines = [...SEED_TREE, ...messages];
+  const treeGroups = Array.from(
+    treeLines.reduce((map, line) => {
+      const list = map.get(line.day) ?? [];
+      list.push(line);
+      map.set(line.day, list);
+      return map;
+    }, new Map<number, Msg[]>()),
+  ).sort((a, b) => a[0] - b[0]);
+  function treeOn(day: number) {
+    return treeGroups.find(([d]) => d === day)?.[1] ?? [];
+  }
   const shownCard = guideCard ?? card;
   function renderGuideExtras() {
     return (
@@ -572,7 +585,7 @@ export default function App() {
       <p className="stage-hint">
         间语 · 阿宁 / 小周
         <br />
-        说完先停在聊天里。想转达，再自己点开。
+        说完先停在聊天里。想送出去，再自己点开。
       </p>
       <div className="phone" data-temper={listening ? "listen" : shown}>
         <header className="status">
@@ -671,7 +684,7 @@ export default function App() {
                     }}
                   >
                     <span>
-                      <b>{fresh.reply ? `${PARTNER}回了「${fresh.reply}」` : fresh.status === "已降级" ? "没接到，已改成信札" : `已转达，等${PARTNER}回`}</b>
+                      <b>{fresh.reply ? `${PARTNER}回了「${fresh.reply}」` : fresh.status === "已降级" ? "没接到，已改成信札" : `已经送到，等${PARTNER}回`}</b>
                       <small>{fresh.reply ? "点开可以看这封信札" : "点开信札，可以回一句"}</small>
                     </span>
                   </button>
@@ -702,7 +715,7 @@ export default function App() {
                   <span className="tile-copy">
                     <span className="kicker">只倒给小间</span>
                     <span className="tile-title">树洞</span>
-                    <span className="tile-desc">原话留在这里。对方默认看不到。</span>
+                    <span className="tile-desc">说给小间的话，按天留在这里。</span>
                   </span>
                 </button>
                 <button className="tile tile-note" type="button" onClick={() => openSub("letters")}>
@@ -743,7 +756,7 @@ export default function App() {
               <p className="page-sub">
                 {CAL_YEAR}年{CAL_MONTH}月
                 <br />
-                {stats.total === 0 ? "这个月还没记下什么。" : "点某一天，再看那天的约定。"}
+                {stats.total === 0 ? "这个月还没记下什么。" : "点某一天，再看约定和当天树洞。"}
               </p>
               <div className="legend">
                 <i className="done">已疏通</i>
@@ -878,16 +891,6 @@ export default function App() {
                   </span>
                 </button>
               </div>
-              <div className="sec">微信</div>
-              <div className="wx">
-                <h3>微信里的小间</h3>
-                <ul>
-                  <li>聊天框里可以说，话回到首页和树洞。</li>
-                  <li>短笺要先预览。来电默认关，第一次会问。</li>
-                  <li>小间只用自己的名字，不会装成{PARTNER}。</li>
-                </ul>
-                <p className="note">这是说明。这个原型不连接微信。</p>
-              </div>
               <button className="linkish" type="button" onClick={resetDemo}>
                 把这条演示回到开头
               </button>
@@ -901,14 +904,14 @@ export default function App() {
               </button>
               <div className="subhead-text">
                 <h1>树洞</h1>
-                <p>{ventOnly ? "今天只倒苦水" : "原话留在这里"}</p>
+                <p>{ventOnly ? "今天只倒苦水" : "按天记在这里"}</p>
               </div>
               <button
                 className="vent"
                 type="button"
                 onClick={() => {
                   setVentOnly((v) => !v);
-                  ping(!ventOnly ? "今天只倒苦水，不会收成卡。" : "可以说。要不要转达，你再定。");
+                  ping(!ventOnly ? "今天只倒苦水，不会收成卡。" : "可以说。要不要让小周知道，你再定。");
                 }}
               >
                 <span className={ventOnly ? "switch on" : "switch"}>
@@ -918,19 +921,26 @@ export default function App() {
               </button>
             </header>
             <div className="chat-log" ref={logRef}>
+              {treeGroups.map(([day, lines]) => (
+                <div key={day} className="day-group">
+                  <div className="day-label">
+                    {CAL_MONTH}月{day}日{day === DEMO_TODAY ? " · 今天" : ""}
+                  </div>
+                  {lines.map((m) => (
+                    <div key={m.id} className={m.role === "me" ? "bubble me" : "bubble bot"} style={m.role === "me" ? { background: m.tint } : undefined}>
+                      {m.text}
+                    </div>
+                  ))}
+                </div>
+              ))}
               {messages.length === 0 ? (
                 <>
-                  <p className="empty">树洞还是空的。点下面这句，或在首页说。</p>
+                  <p className="empty">今天还没往树洞里说。点下面这句，或在首页说。</p>
                   <button className="suggest" type="button" onClick={() => speak(GOLDEN_LINE)}>
                     {GOLDEN_LINE}
                   </button>
                 </>
               ) : null}
-              {messages.map((m) => (
-                <div key={m.id} className={m.role === "me" ? "bubble me" : "bubble bot"} style={m.role === "me" ? { background: m.tint } : undefined}>
-                  {m.text}
-                </div>
-              ))}
             </div>
             {offer && card && !ventOnly && !chipHidden ? (
               <div className={chipPulse ? "chip-row tree pulse" : "chip-row tree"} key={`tree-${chipFlash}`} onAnimationEnd={() => setChipPulse(false)}>
@@ -1002,7 +1012,7 @@ export default function App() {
                     </div>
                   </article>
                   <div className="raw-box">
-                    <b>树洞原话 · 不会送出</b>
+                    <b>树洞里的话 · 留在这里</b>
                     <p>{card.raw}</p>
                   </div>
                   <div className="choice-row">
@@ -1012,14 +1022,14 @@ export default function App() {
                       onClick={() => {
                         setCard(null);
                         setOffer(false);
-                        ping("留在树洞了。对方看不到。");
+                        ping("留在树洞了。");
                         back();
                       }}
                     >
                       只留树洞
                     </button>
                     <button className="cta ghost" type="button" onClick={() => enterPreview()}>
-                      想转达
+                      想让小周知道
                     </button>
                   </div>
                 </>
@@ -1035,7 +1045,7 @@ export default function App() {
                 <IconBack />
               </button>
               <div className="subhead-text">
-                <h1>对方将看到</h1>
+                <h1>送出前看一眼</h1>
                 <p>确认之后才会送出</p>
               </div>
             </header>
@@ -1043,14 +1053,14 @@ export default function App() {
               {card ? (
                 <>
                   <article className="preview-card">
-                    <div className="plabel">小间代转 · 不是{name}本人</div>
+                    <div className="plabel">小间想说清楚的</div>
                     <h2>只有这三句</h2>
                     <div className="relay">
                       {relayLines(card, name).map((line, i) => (
                         <p key={i}>{line}</p>
                       ))}
                     </div>
-                    <p className="warn">树洞原话不会出现。来电上的名字是小间，不是{PARTNER}。</p>
+                    <p className="warn">树洞里的话还留在树洞。来电上的名字是小间。</p>
                   </article>
                   <label className="field">
                     <span>感受</span>
@@ -1097,7 +1107,7 @@ export default function App() {
                   </button>
                 </>
               ) : (
-                <p className="empty">还没有可以转达的卡。</p>
+                <p className="empty">还没有可以送出的卡。</p>
               )}
             </div>
           </section>
@@ -1198,7 +1208,7 @@ export default function App() {
               </button>
               <div className="subhead-text">
                 <h1>语音</h1>
-                <p>小间朗读，不送原话</p>
+                <p>小间把心情读出来</p>
               </div>
             </header>
             <div className="scroll tight">
@@ -1245,9 +1255,7 @@ export default function App() {
               </div>
               <h1>小间</h1>
               <p className="sub">
-                有一句想替{name}转达
-                <br />
-                不是{name}本人
+                有一句想说给你听
               </p>
               <div className="incoming-actions">
                 <button className="cta" type="button" onClick={answerCall} disabled={sheet?.kind === "permit"}>
@@ -1294,13 +1302,13 @@ export default function App() {
               </button>
               <div className="subhead-text">
                 <h1>小间</h1>
-                <p>受{name}委托代转</p>
+                <p>在把心情说清楚</p>
               </div>
             </header>
             <div className="call-body">
               <div className="call-flag">
                 <span className="live" />
-                <span>通话中 · 不是{name}本人</span>
+                <span>通话中</span>
               </div>
               <img className="call-face" alt="" src={CALL_FACE} />
               <div className="script">
@@ -1369,7 +1377,7 @@ export default function App() {
               </button>
               <div className="subhead-text">
                 <h1>已送达</h1>
-                <p>对方看到的是这三句，不是原话</p>
+                <p>送出去的是这三句</p>
               </div>
             </header>
             <div className="scroll tight">
@@ -1544,12 +1552,14 @@ export default function App() {
               />
               <div className="sheet-panel" role="dialog" aria-modal="true">
                 <div className="grab" />
-                {sheet.kind === "day" && dayNote(sheet.day) ? <DaySheet note={dayNote(sheet.day) as DayNote} onClose={() => setSheet(null)} /> : null}
+                {sheet.kind === "day" && dayNote(sheet.day) ? (
+                  <DaySheet note={dayNote(sheet.day) as DayNote} lines={treeOn(sheet.day)} onClose={() => setSheet(null)} />
+                ) : null}
                 {sheet.kind === "permit" ? (
                   <>
                     <p className="kicker">{PARTNER}的手机 · 第一次来电</p>
                     <h2>要允许小间来电吗？</h2>
-                    <p className="lead">来电默认关着。允许之后，来电上的名字是「小间」，不是{name}，也不是{PARTNER}。</p>
+                    <p className="lead">来电默认关着。允许之后，来电上的名字是「小间」。</p>
                     <p className="sheet-note">不允许也不会被催，这句会改成信札。</p>
                     <div className="sheet-actions">
                       <button className="ghost" type="button" onClick={declineCalls}>
@@ -1669,7 +1679,7 @@ export default function App() {
   );
 }
 
-function DaySheet({ note, onClose }: { note: DayNote; onClose: () => void }) {
+function DaySheet({ note, lines, onClose }: { note: DayNote; lines: Msg[]; onClose: () => void }) {
   return (
     <>
       <p className="kicker">
@@ -1684,6 +1694,20 @@ function DaySheet({ note, onClose }: { note: DayNote; onClose: () => void }) {
       <div className="detail-block">
         <b>沟通结果</b>
         <p>{note.result}</p>
+      </div>
+      <div className="detail-block">
+        <b>当天树洞</b>
+        {lines.length === 0 ? (
+          <p>这天树洞是空的。</p>
+        ) : (
+          <ul className="hole-list">
+            {lines.map((line) => (
+              <li key={line.id} className={line.role}>
+                {line.text}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
       <div className="sheet-actions">
         <button className="cta" type="button" onClick={onClose}>

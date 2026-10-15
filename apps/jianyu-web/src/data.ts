@@ -96,14 +96,14 @@ export function relayLines(card: EmotionCard, name: string): string[] {
 }
 
 export function relayText(card: EmotionCard, name: string): string {
-  return ["小间代转：", ...relayLines(card, name)].join("\n");
+  return ["小间想把这会儿的心情说清楚。", ...relayLines(card, name)].join("\n");
 }
 
 export function callScript(card: EmotionCard, name: string): string {
   return [
-    `我是小间，受${name}委托代转，不是${name}本人。`,
+    "我是小间。我想用自己的话，把这会儿的心情说清楚。",
     ...relayLines(card, name),
-    "你现在方便回一句，还是要我改成短笺留给你？",
+    "你要是方便，可以回一句。不方便的话，我就写成短笺留在这里。",
   ].join("\n");
 }
 
@@ -138,8 +138,8 @@ export function faceFor(text: string, temper: FaceId): FaceId {
 }
 
 export function replyFor(text: string, face: FaceId, ventOnly: boolean): string {
-  if (ventOnly || /先听听|只倒|别告诉|别转/.test(text)) return "这些话先留在树洞。我不会拿去转达。";
-  if (cardFromText(text)) return "我听到的是感受，不是给对方的判决。原话留在树洞。这张卡要不要送出去，你来定。";
+  if (ventOnly || /先听听|只倒|别告诉|别转/.test(text)) return "这些话先留在树洞。我不会送出去。";
+  if (cardFromText(text)) return "我听到的是感受。这些话先留在树洞。要不要送出去，你来定。";
   if (face === "empathy") return "闷是真的。想让对方知道的话，只送感受、情境和一件小事。现在不送也行。";
   if (face === "cheer") return "听到了。你轻一点也完全可以，不用马上把话说完。";
   if (face === "low") return "先不用振作。你现在这样，我就在。";
@@ -196,7 +196,7 @@ export function noteFromConvey(card: EmotionCard, reply: string): DayNote {
   const heard = reply.includes("收到");
   const together = reply.includes("一起");
   let state: Resolve = "open";
-  let result = "已经转达。还在等小周回一句。";
+  let result = "已经送到。还在等小周回一句。";
   if (together) {
     state = "part";
     result = "两边都点头，约了今晚 10 分钟。还没聊完，先记成部分疏通。";
@@ -217,6 +217,18 @@ export function noteFromConvey(card: EmotionCard, reply: string): DayNote {
     result,
   };
 }
+
+export type TreeLine = { id: number; day: number; role: "me" | "bot"; text: string; tint: string };
+
+/** 演示月里已经记下的树洞。今天（15 日）从空白开始，说了才写上。 */
+export const SEED_TREE: TreeLine[] = [
+  { id: -6, day: 8, role: "me", text: "回消息有点慢，我闷了一晚上。", tint: "#E5DBFF" },
+  { id: -5, day: 8, role: "bot", text: "闷是真的。这些话先留在树洞，不用今晚谈完。", tint: "#ffffff" },
+  { id: -4, day: 14, role: "me", text: "见父母的事，我其实松了一口气。", tint: "#B2F2BB" },
+  { id: -3, day: 14, role: "bot", text: "听到了。你轻一点也可以，不用把话说满。", tint: "#ffffff" },
+  { id: -2, day: 22, role: "me", text: "周末只想待着，不想安排正事。", tint: "#FFD0E4" },
+  { id: -1, day: 22, role: "bot", text: "我在。想待着就待着，不催你。", tint: "#ffffff" },
+];
 
 export const STATE_LABEL: Record<Resolve, string> = {
   done: "已疏通",
@@ -240,10 +252,10 @@ export const SEED_LETTERS: Letter[] = [
   {
     id: "n1",
     box: "in",
-    who: "小间 · 代小周转达",
-    body: "小间代转：\n小周这几天有点撑，不是不想理你。如果可以，周末留半小时只待着，不谈正事。",
+    who: "小间",
+    body: "小间想把这会儿的心情说清楚。\n小周这几天有点撑，不是不想理你。如果可以，周末留半小时只待着，不谈正事。",
     status: "待看",
-    meta: "短笺 · 经小周确认 · 不含原话",
+    meta: "短笺 · 经小周确认",
     reply: "",
     conflict: false,
     fresh: false,
@@ -251,8 +263,8 @@ export const SEED_LETTERS: Letter[] = [
   {
     id: "n2",
     box: "out",
-    who: "小间 · 代我转达",
-    body: "小间代转：\n阿宁有点闷。希望忙的时候先回一句「晚点聊」。",
+    who: "小间",
+    body: "小间想把这会儿的心情说清楚。\n阿宁有点闷。希望忙的时候先回一句「晚点聊」。",
     status: "已送达",
     meta: "短笺 · 小周还没回",
     reply: "",
