@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>间语</title>
+  <link rel="stylesheet" href="styles2.0.css" />
+</head>
+<body>
+  <div class="stage">
+    <p class="stage-hint">间语 2.0 · 双击即可打开。原来的 index.html 还在。</p>
+
+    <div class="phone" id="phone">
+      <div class="status">
+        <span class="time" id="clock">9:41</span>
+        <span class="island" aria-hidden="true"></span>
+        <span class="status-icons" aria-hidden="true">
+          <svg viewBox="0 0 18 12" width="17" height="12"><rect x="0" y="7" width="3" height="5" rx="0.6" fill="currentColor"/><rect x="5" y="4" width="3" height="8" rx="0.6" fill="currentColor"/><rect x="10" y="1.5" width="3" height="10.5" rx="0.6" fill="currentColor"/><rect x="15" y="0" width="3" height="12" rx="0.6" fill="currentColor" opacity="0.35"/></svg>
+          <svg viewBox="0 0 25 12" width="25" height="12"><rect x="0.5" y="0.5" width="22" height="11" rx="2.5" fill="none" stroke="currentColor" stroke-opacity="0.35"/><rect x="2" y="2" width="16" height="8" rx="1.4" fill="currentColor"/><rect x="23.2" y="4" width="1.4" height="4" rx="0.4" fill="currentColor" opacity="0.4"/></svg>
+        </span>
+      </div>
+
+      <div class="app">
+        <div class="screens">
+          <section class="screen active" id="screen-home" data-tab="home">
+            <div class="home-bar">
+              <span class="brand">间语</span>
+              <button class="quiet" type="button" id="btn-demo">演示</button>
+            </div>
+
+            <div class="hero-wrap">
+              <div class="kin kin-l" id="kin-green" aria-hidden="true"></div>
+              <div class="hero" role="img" aria-label="小间">
+                <div class="hero-shadow" aria-hidden="true"></div>
+                <div class="hero-float" id="home-face"></div>
+              </div>
+              <div class="kin kin-r" id="kin-orange" aria-hidden="true"></div>
+            </div>
+
+            <p class="greet" id="hello-line">阿宁，我在。想说就说。</p>
+
+            <div class="dock">
+              <button class="dock-x" type="button" id="btn-dismiss" aria-label="收起这句话">
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+              </button>
+              <button class="talk" type="button" id="btn-talk">
+                <span class="talk-circle" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="30" height="30"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="#fff" stroke-width="2"/><path d="M6.5 11a5.5 5.5 0 0 0 11 0M12 16.5V20" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
+                </span>
+                <span class="talk-label">跟小间说说</span>
+              </button>
+              <span class="dock-balance" aria-hidden="true"></span>
+            </div>
+
+            <section class="inbox" aria-label="待处理">
+              <h2 class="section-label" id="todo-label">待处理</h2>
+              <div class="group">
+                <button class="cell" type="button" id="btn-home-note">
+                  <span class="cell-main">
+                    <span class="cell-title">对方短笺</span>
+                    <span class="cell-sub">小周的小间转了一句</span>
+                  </span>
+                  <span class="cell-trail trail-hot" id="home-note-trail">待回应</span>
+                  <i class="chevron" aria-hidden="true"></i>
+                </button>
+                <button class="cell" type="button" id="btn-home-digest">
+                  <span class="cell-main">
+                    <span class="cell-title">本期总结</span>
+                    <span class="cell-sub">有一句需求，不会自动发</span>
+                  </span>
+                  <span class="cell-trail trail-hot" id="home-digest-trail">待确认</span>
+                  <i class="chevron" aria-hidden="true"></i>
+                </button>
+              </div>
+            </section>
+          </section>
+
+          <section class="screen" id="screen-tree" data-tab="tree">
+            <div class="chat-nav">
+              <div class="chat-who">
+                <div class="mini" id="tree-face" aria-hidden="true"></div>
+                <div>
+                  <div class="who-name">小间</div>
+                  <div class="who-sub" id="tree-sub">这些话只有你看得到</div>
+                </div>
+              </div>
+              <button class="tint" type="button" id="btn-show-digest">本期总结</button>
+            </div>
+            <div class="switch-row" id="vent-row">
+              <span>今天只倒苦水</span>
+              <span class="switch" id="toggle-vent" role="switch" aria-checked="false"></span>
+            </div>
+            <div class="chat-area" id="chat-area">
+              <div class="msg bot">我在。你想倒倒苦水，还是整理一句想让对方知道的事？不开口也行。</div>
+              <div class="msg user">今晚又觉得对方回消息好慢，有点闷，但又怕一说就变成翻旧账。</div>
+              <div class="msg bot">听起来是「需要被及时看见」，不是在记账。你可以只在树洞里说完。若之后想让 TA 知道，我再帮你收成不指责的短句。不会自己发出去。</div>
+            </div>
+            <div class="digest" id="digest-banner">
+              <p class="digest-kicker">草稿 · 不会自动发送</p>
+              <p class="digest-title">本期树洞总结</p>
+              <p class="digest-body">被及时回应。「忙的时候回一句『晚点聊』，我会安心很多。」</p>
+              <div class="digest-actions">
+                <button class="tint" type="button" id="btn-digest-skip">跳过</button>
+                <button class="fill" type="button" id="btn-digest-forward">请小间转达</button>
+              </div>
+            </div>
+            <div class="composer">
+              <input type="text" id="chat-input" placeholder="跟小间说点什么" autocomplete="off" />
+              <button class="send" type="button" id="btn-send" aria-label="发送">
+                <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 19V6M6.5 11.5 12 6l5.5 5.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+            </div>
+          </section>
+
+          <section class="screen" id="screen-notes" data-tab="notes">
+            <h1 class="large-title">信笺箱</h1>
+            <p class="page-foot">对方的话在上面</p>
+
+            <h2 class="section-label">来信</h2>
+            <div class="group">
+              <article class="letter" id="note-incoming">
+                <div class="letter-top">
+                  <span class="letter-from">小周的小间 · 代转</span>
+                  <span class="letter-state" id="note-tag">待回应</span>
+                </div>
+                <p class="letter-body">「这几天工作有点撑不住，不是不想理你。如果你愿意，周末能不能留半小时只陪我待着、不谈正事？」</p>
+                <p class="letter-meta">经小周确认。小间用自己的身份转达，不是小周本人。</p>
+                <div class="letter-actions" id="note-response-actions">
+                  <button class="tint" type="button" data-resp="later">稍后</button>
+                  <button class="fill" type="button" data-resp="reply">回一句</button>
+                  <button class="tint" type="button" data-resp="invite">一起聊</button>
+                </div>
+              </article>
+              <div class="letter letter-past">
+                <div class="letter-top">
+                  <span class="letter-from">树洞周小结 · 代转</span>
+                  <span class="letter-state is-done">已回应</span>
+                </div>
+                <p class="letter-body">「希望忙的时候能回一句『晚点聊』，我会安心很多。」</p>
+                <p class="letter-meta">你的回应：好，我下次注意。</p>
+              </div>
+            </div>
+
+            <h2 class="section-label">我发出的</h2>
+            <div class="group">
+              <div class="cell">
+                <span class="cell-main">
+                  <span class="cell-title">短笺</span>
+                  <span class="cell-sub">今天有点闷，想被你看见。不是怪你。</span>
+                </span>
+                <span class="cell-trail">已送达</span>
+              </div>
+              <div class="cell">
+                <span class="cell-main">
+                  <span class="cell-title">语音代转</span>
+                  <span class="cell-sub">需要半小时只陪着，不谈正事。</span>
+                </span>
+                <span class="cell-trail">草稿</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="screen" id="screen-us" data-tab="us">
+            <h1 class="large-title">我们</h1>
+            <div class="pair">
+              <div class="pair-avs" aria-hidden="true">
+                <span class="av">宁</span>
+                <span class="av av-warm">周</span>
+              </div>
+              <div>
+                <div class="pair-name">阿宁 · 小周</div>
+                <div class="pair-sub">已配对 · 同意书已签</div>
+              </div>
+            </div>
+
+            <h2 class="section-label">小约定</h2>
+            <div class="group">
+              <div class="cell cell-block">
+                <p>忙的时候先回「晚点聊」。周末留半小时，只陪着，不谈正事。</p>
+              </div>
+            </div>
+
+            <div class="group group-gap">
+              <button class="cell" type="button" id="btn-retro">
+                <span class="cell-title">复盘卡</span>
+                <i class="chevron" aria-hidden="true"></i>
+              </button>
+              <button class="cell" type="button" id="btn-open-channels">
+                <span class="cell-title">通道菜单</span>
+                <i class="chevron" aria-hidden="true"></i>
+              </button>
+            </div>
+
+            <h2 class="section-label">授权与通道</h2>
+            <p class="section-note">关了立刻生效。电话默认关，每次仍要再确认。</p>
+            <div class="group">
+              <div class="cell">
+                <span class="cell-title">私聊默认私密</span>
+                <span class="cell-trail">开</span>
+              </div>
+              <div class="cell">
+                <span class="cell-title">传达需你点头</span>
+                <span class="cell-trail">开</span>
+              </div>
+              <div class="cell">
+                <span class="cell-title">电话代转默认</span>
+                <button class="switch" id="sw-phone-default" type="button" role="switch" aria-checked="false" aria-label="电话代转默认"></button>
+              </div>
+              <div class="cell">
+                <span class="cell-title">短笺</span>
+                <button class="switch on" data-sw="note" type="button" role="switch" aria-checked="true" aria-label="短笺"></button>
+              </div>
+              <div class="cell">
+                <span class="cell-title">语音代转</span>
+                <button class="switch on" data-sw="voice" type="button" role="switch" aria-checked="true" aria-label="语音代转"></button>
+              </div>
+              <div class="cell">
+                <span class="cell-title">允许小间来电</span>
+                <button class="switch on" data-sw="call-in" type="button" role="switch" aria-checked="true" aria-label="允许小间来电"></button>
+              </div>
+              <div class="cell">
+                <span class="cell-title">允许小间代打电话</span>
+                <button class="switch" data-sw="call-out" type="button" role="switch" aria-checked="false" aria-label="允许小间代打电话"></button>
+              </div>
+              <div class="cell">
+                <span class="cell-title">可来电时段</span>
+                <span class="cell-trail">21:00–22:30</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="screen" id="screen-me" data-tab="me">
+            <div class="bar-title">我的</div>
+            <div class="me-hero" role="img" aria-label="我的小间">
+              <div class="hero-shadow" aria-hidden="true"></div>
+              <div class="hero-float" id="persona-art"></div>
+            </div>
+            <h1 class="me-title">小间</h1>
+            <p class="me-meta" id="persona-line">冷静温柔 · 小星球信使 · 刚好就好</p>
+
+            <h2 class="section-label">这只小间</h2>
+            <div class="group">
+              <div class="cell">
+                <span class="cell-title">称呼你</span>
+                <span class="cell-trail" id="info-name">阿宁</span>
+              </div>
+              <div class="cell stack">
+                <span class="cell-title">不希望小间</span>
+                <span class="cell-sub" id="info-taboo">不说教 · 不催沟通</span>
+              </div>
+              <button class="cell" type="button" id="btn-remeet">
+                <span class="cell-title">重新认识</span>
+                <i class="chevron" aria-hidden="true"></i>
+              </button>
+              <button class="cell" type="button" id="btn-trial-again">
+                <span class="cell-title">试聊一句</span>
+                <i class="chevron" aria-hidden="true"></i>
+              </button>
+            </div>
+
+            <h2 class="section-label">微信里的小间</h2>
+            <div class="group">
+              <div class="cell cell-block">
+                <p>可以在微信里跟小间说，话会同步到树洞。短笺预览、电话授权都回这里完成。小间用自己的身份说话，不会冒充你或对方。</p>
+              </div>
+              <div class="cell">
+                <span class="cell-title">通知脱敏</span>
+                <span class="cell-trail">开</span>
+              </div>
+              <div class="cell">
+                <span class="cell-title">安全与求助</span>
+                <span class="cell-trail">常驻</span>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <nav class="tabbar" aria-label="主导航">
+          <button class="tab active" type="button" data-tab="home">
+            <span class="tab-ico" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="13.2" r="6.2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="5.6" r="1.7" fill="currentColor"/><circle cx="9.7" cy="12.8" r="1.05" fill="currentColor"/><circle cx="14.3" cy="12.8" r="1.05" fill="currentColor"/></svg>
+            </span>
+            <span class="tab-label">首页</span>
+          </button>
+          <button class="tab" type="button" data-tab="tree">
+            <span class="tab-ico" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M5 6.5h14a1.5 1.5 0 0 1 1.5 1.5v6.2a1.5 1.5 0 0 1-1.5 1.5H9.8L6.5 19v-3.3H5A1.5 1.5 0 0 1 3.5 14.2V8A1.5 1.5 0 0 1 5 6.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+            </span>
+            <span class="tab-label">树洞</span>
+          </button>
+          <button class="tab" type="button" data-tab="notes">
+            <span class="tab-ico" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="17" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4 7.2 12 13l8-5.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+              <span class="badge" id="notes-dot"></span>
+            </span>
+            <span class="tab-label">信笺</span>
+          </button>
+          <button class="tab" type="button" data-tab="us">
+            <span class="tab-ico" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><circle cx="8.2" cy="10" r="2.1" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="15.8" cy="10" r="2.1" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M5.2 16.8c.7-1.8 2-2.7 3.6-2.7s2.9.9 3.2 2.4M12.2 16.6c.4-1.6 1.6-2.5 3.4-2.5 1.6 0 2.9.9 3.5 2.7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+            </span>
+            <span class="tab-label">我们</span>
+          </button>
+          <button class="tab" type="button" data-tab="me">
+            <span class="tab-ico" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="9" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M6.2 18.2c.9-2.4 2.7-3.5 5.8-3.5s4.9 1.1 5.8 3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            </span>
+            <span class="tab-label">我的</span>
+          </button>
+        </nav>
+
+        <div class="overlay" id="overlay-onboarding" role="dialog" aria-label="认识小间">
+          <div class="overlay-nav">
+            <button class="icon-btn" type="button" id="ob-close" aria-label="关闭">
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+            </button>
+            <h2>认识小间</h2>
+            <span class="nav-count" id="ob-step-label">1 / 5</span>
+          </div>
+          <div class="overlay-body">
+            <div class="step-dots" id="ob-dots"></div>
+            <div id="ob-content"></div>
+          </div>
+          <div class="overlay-footer">
+            <button class="fill fill-block" type="button" id="ob-next">下一步</button>
+            <button class="tint tint-center" type="button" id="ob-skip">跳过</button>
+          </div>
+        </div>
+
+        <div class="sheet-backdrop" id="sheet-channels">
+          <div class="sheet" role="dialog" aria-label="通道菜单">
+            <div class="sheet-handle"></div>
+            <h2>请小间怎么转达</h2>
+            <p class="sheet-lead">对方看到的是整理后的需求，不是树洞原文。</p>
+            <div class="group">
+              <button class="cell channel" type="button" data-ch="note">
+                <span class="cell-main">
+                  <span class="cell-title">短笺</span>
+                  <span class="cell-sub">可以改，可以预览。对方还没读，就能撤回。</span>
+                </span>
+                <span class="cell-trail trail-hot">推荐</span>
+              </button>
+              <button class="cell channel" type="button" data-ch="voice">
+                <span class="cell-main">
+                  <span class="cell-title">语音代转</span>
+                  <span class="cell-sub">小间用自己的声音念。还没听，可以撤回。</span>
+                </span>
+              </button>
+              <button class="cell channel" type="button" data-ch="call" id="ch-call">
+                <span class="cell-main">
+                  <span class="cell-title">小间电话</span>
+                  <span class="cell-sub" id="ch-call-desc">以小间的身份打，不冒充对方。要双方都开，这一次还要再确认。</span>
+                </span>
+              </button>
+              <button class="cell channel" type="button" data-ch="pause">
+                <span class="cell-main">
+                  <span class="cell-title">先暂停</span>
+                  <span class="cell-sub">先冷却。到点只问要不要整理一句台阶。</span>
+                </span>
+              </button>
+            </div>
+            <button class="tint tint-center" type="button" id="sheet-close">取消</button>
+          </div>
+        </div>
+
+        <div class="phone-call" id="phone-call">
+          <p class="call-kicker">来电 · 小间（间语）</p>
+          <div class="call-face" id="call-face" aria-hidden="true"></div>
+          <h2 class="call-name">小间</h2>
+          <p class="call-sub" id="call-sub">我是小间，代阿宁转达。不是阿宁本人，也不是你的伴侣。</p>
+          <div class="call-script" id="call-script"></div>
+          <div class="call-actions" id="call-actions">
+            <div class="call-action">
+              <button class="round reject" type="button" id="call-reject" aria-label="拒接">
+                <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+              </button>
+              <span>拒接</span>
+            </div>
+            <div class="call-action">
+              <button class="round accept" type="button" id="call-accept" aria-label="接听">
+                <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M8 4.8h2.1l1.1 2.8-1.5.9a11 11 0 0 0 5.2 5.2l.9-1.5 2.8 1.1V16a1.8 1.8 0 0 1-2 1.8A13.2 13.2 0 0 1 6.2 6.8 1.8 1.8 0 0 1 8 4.8z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+              </button>
+              <span>接听</span>
+            </div>
+          </div>
+          <div class="call-decline" id="call-decline">
+            未接。已改成留言和短笺，不会连环打。
+            <button class="fill" type="button" id="call-done">知道了</button>
+          </div>
+        </div>
+
+        <div class="toast" id="toast" role="status"></div>
+      </div>
+    </div>
+  </div>
+  <script src="app2.0.js"></script>
+</body>
+</html>
