@@ -12,85 +12,100 @@
     taboos: ["不说教", "不催沟通"],
     obStep: 0,
     obDraft: {},
-    digestShown: false,
     callOutEnabled: false,
   };
 
   const TAB_META = {
-    home: { title: "首页·小间", sub: () => `${state.temper} · ${state.look}` },
-    tree: { title: "树洞", sub: () => (state.ventOnly ? "今日仅树洞 · 不推销转达" : "倾听 · 可整理需求") },
-    notes: { title: "信笺箱", sub: () => "短笺 · 语音 · 通话摘要" },
-    us: { title: "我们", sub: () => "配对 · 授权 · 小约定" },
-    me: { title: "我的", sub: () => "完整形象 · 隐私 · 安全" },
+    home: { title: "首页", sub: function () { return ""; } },
+    tree: {
+      title: "树洞",
+      sub: function () {
+        return state.ventOnly ? "今天只听，不推销转达" : "说的话默认只有你看得到";
+      },
+    },
+    notes: { title: "信笺箱", sub: function () { return "对方的话在最上面"; } },
+    us: { title: "我们", sub: function () { return "授权和约定收在这里"; } },
+    me: { title: "我的", sub: function () { return "这只小间只有你看得到"; } },
+  };
+
+  const TEMPER_VISUAL = {
+    软萌陪伴: { stroke: "#e8a317", face: "#fff8e8", eyes: "round", mouth: "wide", blush: true },
+    冷静温柔: { stroke: "#12b8c2", face: "#f4fbfb", eyes: "calm", mouth: "soft", blush: false },
+    "毒舌但善良": { stroke: "#f25c2a", face: "#fff6f1", eyes: "sharp", mouth: "smirk", blush: false },
   };
 
   const TEMPER_REPLIES = {
-    软萌陪伴: "嗨嗨～听到了。今天闷闷的没关系，我陪你待一会儿，不着急把话说成结论。",
+    软萌陪伴: "嗨嗨，听到了。今天闷闷的没关系，我陪你待一会儿，不着急把话说成结论。",
     冷静温柔: "我听到了。累和闷都可以先放在这里。你要是愿意，我们一句一句来；不想整理也可以。",
     "毒舌但善良": "气压不对就对了。说或不说都行，我又不收咨询费——但别一个人硬扛到爆。",
+  };
+
+  const OPENERS = {
+    软萌陪伴: "嗨嗨，我是小间。好像有点闷闷的，要不要和我说两句？",
+    冷静温柔: "我是小间。如果你这会儿想找人说说，我在。",
+    "毒舌但善良": "气压有点不对。说或不说都行，我又不收咨询费。",
   };
 
   const OB_STEPS = [
     {
       key: "temper",
-      title: "小间的气质",
-      hint: "像交朋友，不像填量表。可随时改。",
+      title: "小间什么气质",
+      hint: "像交一个朋友。不满意，下一句就能换。",
       options: [
-        { id: "软萌陪伴", d: "更多共情、轻贴纸；严肃问题仍不轻飘。" },
-        { id: "冷静温柔", d: "少打断、一句一问；成人感、误伤少。（默认）" },
-        { id: "毒舌但善良", d: "私聊可解压；代转仍走 Soft Start-up，禁止攻击伴侣。" },
+        { id: "软萌陪伴", d: "更软一点。正经事仍然不轻飘。" },
+        { id: "冷静温柔", d: "少打断，一句一问。默认是这个。" },
+        { id: "毒舌但善良", d: "私聊可以吐槽。转达给对方时仍然好好说话。" },
       ],
       def: "冷静温柔",
     },
     {
       key: "look",
-      title: "形象系",
-      hint: "完整形象会在「我的」页展示。",
+      title: "同一个小间，小配件",
+      hint: "脸不会换一套画风，只换天线或耳朵。",
       options: [
-        { id: "小星球信使", d: "温和信使感，像从另一颗小星球来送信。（默认）" },
-        { id: "动物系软兽", d: "软软的陪伴感，适合想被哄但不说教的时候。" },
-        { id: "小人偶贴纸风", d: "扁平贴纸感，轻盈、不压迫。" },
+        { id: "小星球信使", d: "天线顶上一枚小星球。默认。" },
+        { id: "动物系软兽", d: "多两只圆耳朵，还是这只 bot。" },
+        { id: "小人偶贴纸风", d: "脸上多一枚小黄贴纸。" },
       ],
       def: "小星球信使",
     },
     {
       key: "freq",
-      title: "主动频率",
-      hint: "影响触达配额；一键暂停仍可用。",
+      title: "小间多久找你",
+      hint: "只影响主动开口。你随时可以让它安静。",
       options: [
-        { id: "很少开口", d: "阈值更高；每周主动私聊上限更低。" },
-        { id: "刚好就好", d: "中等触达，仍须自报门闩。（默认）" },
-        { id: "多关心一点", d: "稍勤快一点，但仍不连环催。" },
+        { id: "很少开口", d: "更少主动来找你。" },
+        { id: "刚好就好", d: "偶尔出现。默认。" },
+        { id: "多关心一点", d: "稍勤快，仍然不连环催。" },
       ],
       def: "刚好就好",
     },
     {
       key: "callName",
       title: "怎么叫你",
-      hint: "仅影响小间对你的称呼。",
+      hint: "只影响小间对你的称呼。",
       options: [
         { id: "阿宁", d: "用你的名字。" },
-        { id: "你", d: "中性、克制。" },
-        { id: "宝", d: "更亲昵（可自定义，Demo 示意）。" },
+        { id: "你", d: "中性，克制。" },
+        { id: "宝", d: "更亲一点。这里只是示意。" },
       ],
       def: "阿宁",
     },
     {
       key: "taboos",
-      title: "不希望小间……",
-      hint: "可多选。危机时一律切平静安全话术。",
+      title: "不希望小间",
+      hint: "可以多选。遇到安全问题，一律改成平静说话。",
       multi: true,
       options: [
-        { id: "不说教", d: "禁止「你应该」。" },
+        { id: "不说教", d: "不说「你应该」。" },
         { id: "不太撒娇", d: "少卖萌。" },
-        { id: "不催沟通", d: "不主动推销「该告诉对方了」。" },
-        { id: "不用心理学术语", d: "不标签你。" },
+        { id: "不催沟通", d: "不推销「该告诉对方了」。" },
+        { id: "不用心理学术语", d: "不给你贴标签。" },
       ],
       def: ["不说教", "不催沟通"],
     },
   ];
 
-  /* ---------- helpers ---------- */
   function $(sel, root) {
     return (root || document).querySelector(sel);
   }
@@ -103,105 +118,190 @@
     el.textContent = msg;
     el.classList.add("show");
     clearTimeout(toast._t);
-    toast._t = setTimeout(() => el.classList.remove("show"), 2200);
+    toast._t = setTimeout(function () { el.classList.remove("show"); }, 2200);
   }
 
-  function drawFace(svgHost, temper) {
-    // CSS/SVG 小间形象占位，无外网图
-    const palette = {
-      软萌陪伴: { a: "#f3c9c0", b: "#e8a99a", eye: "#5a4038" },
-      冷静温柔: { a: "#e8d5c4", b: "#c4785a", eye: "#3d3530" },
-      "毒舌但善良": { a: "#d4c4b0", b: "#8a6a5a", eye: "#2c2a28" },
-    };
-    const p = palette[temper] || palette["冷静温柔"];
-    svgHost.innerHTML = `
-      <svg viewBox="0 0 100 100" width="100%" height="100%" aria-hidden="true">
-        <defs>
-          <radialGradient id="g1" cx="40%" cy="35%" r="60%">
-            <stop offset="0%" stop-color="${p.a}"/>
-            <stop offset="100%" stop-color="${p.b}"/>
-          </radialGradient>
-        </defs>
-        <circle cx="50" cy="50" r="42" fill="url(#g1)"/>
-        <circle cx="50" cy="52" r="28" fill="rgba(255,255,255,0.25)"/>
-        <!-- 星球小耳朵 / 信使角 -->
-        <ellipse cx="28" cy="28" rx="8" ry="11" fill="${p.b}" opacity="0.85"/>
-        <ellipse cx="72" cy="28" rx="8" ry="11" fill="${p.b}" opacity="0.85"/>
-        <!-- 眼睛 -->
-        <circle cx="38" cy="48" r="3.2" fill="${p.eye}"/>
-        <circle cx="62" cy="48" r="3.2" fill="${p.eye}"/>
-        <circle cx="39" cy="47" r="1" fill="#fff"/>
-        <circle cx="63" cy="47" r="1" fill="#fff"/>
-        <!-- 微笑 -->
-        <path d="M40 60 Q50 68 60 60" stroke="${p.eye}" stroke-width="2.2" fill="none" stroke-linecap="round"/>
-        <!-- 小星星 -->
-        <circle cx="78" cy="62" r="2" fill="#fff" opacity="0.7"/>
-        <circle cx="22" cy="58" r="1.5" fill="#fff" opacity="0.5"/>
-      </svg>`;
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
   }
 
-  function drawPersonaArt() {
-    const host = $("#persona-art");
-    const lookHint = {
-      小星球信使: "信使",
-      动物系软兽: "软兽",
-      小人偶贴纸风: "贴纸",
-    };
-    host.innerHTML = "";
-    const wrap = document.createElement("div");
-    wrap.style.cssText = "width:100px;height:100px";
-    drawFace(wrap, state.temper);
-    host.appendChild(wrap);
-    const cap = document.createElement("div");
-    cap.style.cssText =
-      "position:absolute;bottom:10px;left:0;right:0;font-size:11px;color:rgba(44,42,40,0.55);font-weight:600";
-    cap.textContent = lookHint[state.look] || state.look;
-    host.style.position = "relative";
-    host.appendChild(cap);
+  function visualOf(temper) {
+    return TEMPER_VISUAL[temper] || TEMPER_VISUAL["冷静温柔"];
+  }
+
+  function xiaojianSVG(temper, look, variant) {
+    const v = visualOf(temper);
+    const full = variant === "full";
+    const ink = "#1a2332";
+    const sw = full ? 4 : 6;
+    const face = v.face;
+    const stroke = v.stroke;
+
+    let eyes;
+    if (v.eyes === "round") {
+      eyes = [
+        '<circle cx="78" cy="92" r="9" fill="' + ink + '"/>',
+        '<circle cx="122" cy="92" r="9" fill="' + ink + '"/>',
+        '<circle cx="81.5" cy="88.5" r="2.8" fill="#fff"/>',
+        '<circle cx="125.5" cy="88.5" r="2.8" fill="#fff"/>',
+      ].join("");
+    } else if (v.eyes === "sharp") {
+      eyes = [
+        '<ellipse cx="78" cy="94" rx="9" ry="5.5" fill="' + ink + '"/>',
+        '<ellipse cx="122" cy="94" rx="9" ry="5.5" fill="' + ink + '"/>',
+        '<circle cx="81" cy="92.5" r="2.1" fill="#fff"/>',
+        '<circle cx="125" cy="92.5" r="2.1" fill="#fff"/>',
+        '<path d="M66 78 Q76 74 86 78" stroke="' + ink + '" stroke-width="3" fill="none" stroke-linecap="round"/>',
+        '<path d="M112 76 Q126 66 138 78" stroke="' + ink + '" stroke-width="3.2" fill="none" stroke-linecap="round"/>',
+      ].join("");
+    } else {
+      eyes = [
+        '<ellipse cx="78" cy="92" rx="7" ry="9" fill="' + ink + '"/>',
+        '<ellipse cx="122" cy="92" rx="7" ry="9" fill="' + ink + '"/>',
+        '<circle cx="80.5" cy="88.5" r="2.4" fill="#fff"/>',
+        '<circle cx="124.5" cy="88.5" r="2.4" fill="#fff"/>',
+      ].join("");
+    }
+
+    let mouth;
+    if (v.mouth === "wide") {
+      mouth = '<path d="M72 116 Q100 136 128 116" stroke="' + ink + '" stroke-width="4" fill="none" stroke-linecap="round"/>';
+    } else if (v.mouth === "smirk") {
+      mouth = '<path d="M76 120 Q104 128 130 110" stroke="' + ink + '" stroke-width="4" fill="none" stroke-linecap="round"/>';
+    } else {
+      mouth = '<path d="M80 118 Q100 130 120 118" stroke="' + ink + '" stroke-width="4" fill="none" stroke-linecap="round"/>';
+    }
+
+    const blush = v.blush
+      ? '<ellipse cx="58" cy="112" rx="9" ry="4.5" fill="#f0c56a"/>' +
+        '<ellipse cx="142" cy="112" rx="9" ry="4.5" fill="#f0c56a"/>'
+      : "";
+
+    const ears = look === "动物系软兽"
+      ? '<circle cx="36" cy="96" r="16" fill="' + face + '" stroke="' + stroke + '" stroke-width="' + sw + '"/>' +
+        '<circle cx="164" cy="96" r="16" fill="' + face + '" stroke="' + stroke + '" stroke-width="' + sw + '"/>'
+      : "";
+
+    const ring = look === "小星球信使"
+      ? '<ellipse cx="100" cy="16" rx="14" ry="4.2" fill="none" stroke="' + stroke + '" stroke-width="2.4"/>'
+      : "";
+
+    const sticker = look === "小人偶贴纸风"
+      ? '<rect x="128" y="112" width="26" height="26" rx="7" fill="#ffe14a" stroke="' + stroke + '" stroke-width="2.4"/>' +
+        '<circle cx="136" cy="122" r="1.7" fill="' + ink + '"/>' +
+        '<circle cx="146" cy="122" r="1.7" fill="' + ink + '"/>' +
+        '<path d="M135 128 Q141 132 147 128" stroke="' + ink + '" stroke-width="1.5" fill="none" stroke-linecap="round"/>'
+      : "";
+
+    const body = full
+      ? '<ellipse cx="100" cy="214" rx="38" ry="7" fill="rgba(26,35,50,0.08)"/>' +
+        '<line x1="70" y1="176" x2="46" y2="186" stroke="' + stroke + '" stroke-width="' + sw + '" stroke-linecap="round"/>' +
+        '<line x1="130" y1="176" x2="154" y2="186" stroke="' + stroke + '" stroke-width="' + sw + '" stroke-linecap="round"/>' +
+        '<circle cx="44" cy="188" r="7" fill="' + face + '" stroke="' + stroke + '" stroke-width="' + sw + '"/>' +
+        '<circle cx="156" cy="188" r="7" fill="' + face + '" stroke="' + stroke + '" stroke-width="' + sw + '"/>' +
+        '<rect x="68" y="150" width="64" height="52" rx="24" fill="' + face + '" stroke="' + stroke + '" stroke-width="' + sw + '"/>' +
+        '<circle cx="100" cy="176" r="6" fill="' + stroke + '"/>'
+      : "";
+
+    const viewBox = full ? "0 0 200 228" : (look === "动物系软兽" ? "12 0 176 164" : "28 0 144 162");
+
+    return (
+      '<svg viewBox="' + viewBox + '" width="100%" height="100%" aria-hidden="true">' +
+        ears +
+        body +
+        '<line x1="100" y1="40" x2="100" y2="20" stroke="' + stroke + '" stroke-width="' + sw + '" stroke-linecap="round"/>' +
+        '<circle cx="100" cy="16" r="8" fill="' + stroke + '"/>' +
+        ring +
+        '<rect x="38" y="40" width="124" height="116" rx="50" fill="' + face + '" stroke="' + stroke + '" stroke-width="' + sw + '"/>' +
+        eyes +
+        blush +
+        mouth +
+        sticker +
+      "</svg>"
+    );
+  }
+
+  function paintHost(el, variant) {
+    if (!el) return;
+    el.innerHTML = xiaojianSVG(state.temper, state.look, variant);
+  }
+
+  function paintXiaojian() {
+    paintHost($("#home-face"), "head");
+    paintHost($("#tree-face"), "head");
+    paintHost($("#call-face"), "head");
+    paintHost($("#persona-art"), "full");
+  }
+
+  function updateCallCopy() {
+    const name = state.callName;
+    $("#call-sub").textContent = "我是小间，代" + name + "转达。不是" + name + "本人，也不是你的伴侣。";
+    $("#call-script").innerHTML =
+      "<strong>小间会这样说</strong><br><br>「你好，我是间语的小间。这通电话是" +
+      escapeHtml(name) +
+      "授权我代为转达的，不是 TA 本人。TA 希望你知道：忙的时候如果能回一句『晚点聊』，会安心很多。不需要你现在做任何保证。」";
   }
 
   function syncPersonaUI() {
     $("#tag-temper").textContent = state.temper;
     $("#tag-look").textContent = state.look;
     $("#tag-freq").textContent = state.freq;
-    $("#info-temper").textContent = state.temper;
-    $("#info-look").textContent = state.look;
-    $("#info-freq").textContent = state.freq;
-    $("#info-taboo").textContent = state.taboos.join(" · ") || "无";
-    drawFace($("#home-face"), state.temper);
-    drawFace($("#call-face"), state.temper);
-    drawPersonaArt();
-    const bubble = TEMPER_REPLIES[state.temper] || TEMPER_REPLIES["冷静温柔"];
-    // 首页开场随气质
-    const openers = {
-      软萌陪伴: "嗨嗨，我是小间～好像有点闷闷的，要不要和我说两句？",
-      冷静温柔: "我是小间。如果你这会儿想找人说说，我在。",
-      "毒舌但善良": "气压有点不对。说或不说都行，我又不收咨询费。",
-    };
-    $("#home-bubble-msg").textContent = openers[state.temper] || openers["冷静温柔"];
+    $("#info-taboo").textContent = state.taboos.length ? state.taboos.join(" · ") : "没有特别禁忌";
+    $("#info-name").textContent = state.callName;
+    $("#hello-title").textContent = "嗨，" + state.callName;
+    $("#home-bubble-msg").textContent = OPENERS[state.temper] || OPENERS["冷静温柔"];
+    paintXiaojian();
+    updateCallCopy();
     updateTopbar();
   }
 
   function updateTopbar() {
-    const m = TAB_META[state.tab];
-    $("#top-title").textContent = m.title;
-    $("#top-sub").textContent = m.sub();
+    const meta = TAB_META[state.tab];
+    const bar = $("#topbar");
+    $("#top-title").textContent = meta.title;
+    $("#top-sub").textContent = meta.sub();
+    bar.classList.toggle("is-home", state.tab === "home");
+    bar.classList.toggle("is-focus", state.tab === "tree" || state.tab === "notes");
+    bar.classList.toggle("is-quiet", state.tab === "us" || state.tab === "me");
   }
 
   function switchTab(tab) {
     state.tab = tab;
-    $all(".screen").forEach((s) => s.classList.toggle("active", s.dataset.tab === tab));
-    $all(".tab").forEach((t) => t.classList.toggle("active", t.dataset.tab === tab));
+    $all(".screen").forEach(function (s) {
+      s.classList.toggle("active", s.dataset.tab === tab);
+    });
+    $all(".tab").forEach(function (t) {
+      t.classList.toggle("active", t.dataset.tab === tab);
+    });
     updateTopbar();
-    // 树洞屏隐藏顶栏副操作习惯：保持
-    if (tab === "tree") {
-      $("#wechat-note").style.opacity = "0.55";
-    } else {
-      $("#wechat-note").style.opacity = "0.92";
-    }
   }
 
-  /* ---------- 认识小间 ---------- */
+  function setDigest(open) {
+    $("#digest-banner").classList.toggle("show", open);
+  }
+
+  function markHomeDigest(label, done) {
+    const tag = $("#home-digest-tag");
+    const card = $("#btn-home-digest");
+    if (tag) {
+      tag.textContent = label;
+      tag.className = "tag " + (done ? "tag-mute" : "tag-cyan");
+    }
+    if (card) card.classList.toggle("is-done", !!done);
+    refreshTodoCount();
+  }
+
+  function refreshTodoCount() {
+    const n = $all(".todo:not(.is-done)").length;
+    const count = $(".todo-count");
+    const label = $(".todo-head span");
+    if (count) count.textContent = String(n);
+    if (label) label.textContent = n ? "待你处理" : "都处理过了";
+  }
+
   function openOnboarding() {
     state.obStep = 0;
     state.obDraft = {
@@ -222,47 +322,44 @@
   function renderObStep() {
     const step = OB_STEPS[state.obStep];
     const last = state.obStep === OB_STEPS.length - 1;
-    $("#ob-step-label").textContent = `${state.obStep + 1} / ${OB_STEPS.length}`;
-    $("#ob-next").textContent = last ? "完成并试聊" : "下一步";
-
-    const dots = $("#ob-dots");
-    dots.innerHTML = OB_STEPS.map((_, i) => `<span class="${i === state.obStep ? "on" : ""}"></span>`).join("");
+    $("#ob-step-label").textContent = (state.obStep + 1) + " / " + OB_STEPS.length;
+    $("#ob-next").textContent = last ? "完成" : "下一步";
+    $("#ob-dots").innerHTML = OB_STEPS.map(function (_, i) {
+      return '<span class="' + (i === state.obStep ? "on" : "") + '"></span>';
+    }).join("");
 
     const selected = state.obDraft[step.key];
-    let html = `<div class="card-title">${step.title}</div><p class="card-desc" style="margin-bottom:12px">${step.hint}</p><div class="option-list">`;
-    step.options.forEach((op) => {
-      let isSel = false;
-      if (step.multi) {
-        isSel = (selected || []).includes(op.id);
-      } else {
-        isSel = selected === op.id;
-      }
-      html += `<button type="button" class="option ${isSel ? "selected" : ""}" data-opt="${op.id}">
-        <div class="ot">${op.id}</div><div class="od">${op.d}</div></button>`;
+    const preview = xiaojianSVG(
+      state.obDraft.temper || "冷静温柔",
+      state.obDraft.look || "小星球信使",
+      "head"
+    );
+    let html = '<div class="ob-preview">' + preview + "</div>";
+    html += '<div class="ob-title">' + step.title + "</div>";
+    html += '<p class="ob-hint">' + step.hint + "</p><div class=\"option-list\">";
+    step.options.forEach(function (op) {
+      const isSel = step.multi ? (selected || []).indexOf(op.id) !== -1 : selected === op.id;
+      html += '<button type="button" class="option ' + (isSel ? "selected" : "") + '" data-opt="' + op.id + '">';
+      html += '<div class="ot">' + op.id + '</div><div class="od">' + op.d + "</div></button>";
     });
     html += "</div>";
-
     if (last) {
       const t = state.obDraft.temper || "冷静温柔";
-      html += `<div class="trial-box"><div class="prompt">试聊：你说「今天有点累」→ 小间用所选气质回</div>
-        <div class="reply" id="trial-reply">${TEMPER_REPLIES[t]}</div></div>`;
+      html += '<div class="trial-box"><div class="prompt">你说「今天有点累」。小间这样回：</div>';
+      html += '<div class="reply" id="trial-reply">' + escapeHtml(TEMPER_REPLIES[t]) + "</div></div>";
     }
-
     $("#ob-content").innerHTML = html;
 
-    $all(".option", $("#ob-content")).forEach((btn) => {
-      btn.addEventListener("click", () => {
+    $all(".option", $("#ob-content")).forEach(function (btn) {
+      btn.addEventListener("click", function () {
         const id = btn.dataset.opt;
         if (step.multi) {
-          let arr = state.obDraft.taboos ? state.obDraft.taboos.slice() : [];
-          if (arr.includes(id)) arr = arr.filter((x) => x !== id);
+          let arr = (state.obDraft.taboos || []).slice();
+          if (arr.indexOf(id) !== -1) arr = arr.filter(function (x) { return x !== id; });
           else arr.push(id);
           state.obDraft.taboos = arr;
         } else {
           state.obDraft[step.key] = id;
-          if (step.key === "temper" && $("#trial-reply")) {
-            $("#trial-reply").textContent = TEMPER_REPLIES[id];
-          }
         }
         renderObStep();
       });
@@ -278,42 +375,27 @@
     state.taboos = d.taboos && d.taboos.length ? d.taboos.slice() : [];
     syncPersonaUI();
     closeOnboarding();
-    toast("从下一句开始换新语气。历史对话不会重写。");
+    toast("下一句开始换语气。已经说过的话不会改写。");
     switchTab("me");
   }
 
-  /* ---------- 树洞聊天 ---------- */
   function appendMsg(role, text) {
     const area = $("#chat-area");
     const div = document.createElement("div");
     div.className = "msg " + role;
-    if (role === "bot") {
-      div.innerHTML = `<div class="meta">小间</div>${escapeHtml(text)}`;
-    } else {
-      div.textContent = text;
-    }
+    if (role === "bot") div.innerHTML = '<div class="meta">小间</div>' + escapeHtml(text);
+    else div.textContent = text;
     area.appendChild(div);
     area.scrollTop = area.scrollHeight;
   }
 
-  function escapeHtml(s) {
-    return String(s)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-  }
-
   function botReply(userText) {
-    if (state.ventOnly) {
-      return (
-        TEMPER_REPLIES[state.temper] +
-        "（今天只倒苦水：我不会推销转达。想说随时继续。）"
-      );
-    }
+    const base = TEMPER_REPLIES[state.temper] || TEMPER_REPLIES["冷静温柔"];
+    if (state.ventOnly) return base + " 今天只倒苦水，我不会推销转达。";
     if (/累|闷|慢|委屈|怕/.test(userText)) {
-      return "我接住了。这更像「需要被及时看见」。你可以继续倒；若哪天想让 TA 知道，点「本期总结」里的「请小间转达」即可——我不会自动发。";
+      return "我接住了。这更像「需要被及时看见」。你可以继续说。想让对方知道的话，打开本期总结，点「请小间转达」。我不会自己发出去。";
     }
-    return TEMPER_REPLIES[state.temper] || "我在听。";
+    return base;
   }
 
   function sendChat() {
@@ -322,19 +404,15 @@
     if (!text) return;
     appendMsg("user", text);
     input.value = "";
-    setTimeout(() => appendMsg("bot", botReply(text)), 450);
+    setTimeout(function () { appendMsg("bot", botReply(text)); }, 450);
   }
 
-  /* ---------- 通道 / 电话 ---------- */
   function openChannels() {
-    const callBtn = $("#ch-call");
-    if (state.callOutEnabled) {
-      callBtn.classList.remove("disabled");
-      callBtn.querySelector(".ci-desc").textContent =
-        "以小间身份代转，不冒充伴侣。需双方授权与当次确认。";
-    } else {
-      // 仍可点，但提示需开启——Demo 允许进入示意
-      callBtn.classList.remove("disabled");
+    const desc = $("#ch-call-desc");
+    if (desc) {
+      desc.textContent = state.callOutEnabled
+        ? "以小间身份打，不冒充伴侣。这一次仍要你再确认。"
+        : "以小间身份打，不冒充伴侣。现在「代打电话」还关着，仍可预览来电界面。";
     }
     $("#sheet-channels").classList.add("open");
   }
@@ -355,186 +433,176 @@
     $("#phone-call").classList.remove("open");
   }
 
-  /* ---------- 时钟 ---------- */
   function tickClock() {
     const now = new Date();
     const h = String(now.getHours()).padStart(2, "0");
     const m = String(now.getMinutes()).padStart(2, "0");
-    $("#clock").textContent = `${h}:${m}`;
+    $("#clock").textContent = h + ":" + m;
   }
 
-  /* ---------- 绑定 ---------- */
   function bind() {
-    $all(".tab").forEach((t) => {
-      t.addEventListener("click", () => switchTab(t.dataset.tab));
+    $all(".tab").forEach(function (t) {
+      t.addEventListener("click", function () { switchTab(t.dataset.tab); });
+    });
+    $all("[data-go]").forEach(function (btn) {
+      btn.addEventListener("click", function () { switchTab(btn.dataset.go); });
     });
 
-    $all("[data-go]").forEach((btn) => {
-      btn.addEventListener("click", () => switchTab(btn.dataset.go));
+    $("#btn-home-note").addEventListener("click", function () { switchTab("notes"); });
+    $("#btn-home-digest").addEventListener("click", function () {
+      switchTab("tree");
+      setDigest(true);
     });
 
     $("#btn-open-onboarding").addEventListener("click", openOnboarding);
     $("#btn-remeet").addEventListener("click", openOnboarding);
     $("#ob-close").addEventListener("click", closeOnboarding);
-    $("#ob-skip").addEventListener("click", () => {
+    $("#ob-skip").addEventListener("click", function () {
       const step = OB_STEPS[state.obStep];
       if (!state.obDraft[step.key]) state.obDraft[step.key] = step.def;
       if (state.obStep < OB_STEPS.length - 1) {
-        state.obStep++;
+        state.obStep += 1;
         renderObStep();
       } else finishOnboarding();
     });
-    $("#ob-next").addEventListener("click", () => {
+    $("#ob-next").addEventListener("click", function () {
       const step = OB_STEPS[state.obStep];
       if (step.multi && !state.obDraft.taboos) state.obDraft.taboos = step.def.slice();
       else if (!step.multi && !state.obDraft[step.key]) state.obDraft[step.key] = step.def;
       if (state.obStep < OB_STEPS.length - 1) {
-        state.obStep++;
+        state.obStep += 1;
         renderObStep();
       } else finishOnboarding();
     });
 
-    $("#btn-trial-again").addEventListener("click", () => {
-      toast("试聊：「今天有点累」→ " + TEMPER_REPLIES[state.temper]);
+    $("#btn-trial-again").addEventListener("click", function () {
+      toast("「今天有点累」→ " + TEMPER_REPLIES[state.temper]);
     });
 
-    $("#btn-bubble-dismiss").addEventListener("click", () => {
-      $("#home-bubble").style.display = "none";
-      toast("好。需要时点「先跟小间说」。");
+    $("#btn-bubble-dismiss").addEventListener("click", function () {
+      $("#home-bubble").classList.add("is-hidden");
+      toast("好。想说的时候，点那颗大按钮。");
     });
-
-    $("#btn-demo-signal").addEventListener("click", () => {
-      $("#home-bubble").style.display = "block";
+    $("#btn-demo-signal").addEventListener("click", function () {
+      $("#home-bubble").classList.remove("is-hidden");
       switchTab("home");
-      toast("演示：模拟「需要聊聊」触达气泡");
+      toast("演示：小间轻轻问了一句");
     });
 
-    // 只倒苦水
-    $("#toggle-vent-wrap").addEventListener("click", () => {
+    $("#toggle-vent-wrap").addEventListener("click", function (e) {
+      if (e.target.closest && e.target.closest(".tree-face")) return;
       state.ventOnly = !state.ventOnly;
       const sw = $("#toggle-vent");
       sw.classList.toggle("on", state.ventOnly);
       sw.setAttribute("aria-checked", state.ventOnly ? "true" : "false");
       updateTopbar();
-      toast(state.ventOnly ? "已开启：关闭自动建议转达" : "已关闭「只倒苦水」");
+      toast(state.ventOnly ? "今天只听，不推销转达" : "可以在你点头之后再转达");
     });
 
-    $("#btn-show-digest").addEventListener("click", () => {
-      const ban = $("#digest-banner");
-      const show = ban.style.display === "none" || !ban.style.display;
-      ban.style.display = show ? "block" : "none";
-      state.digestShown = show;
+    $("#btn-show-digest").addEventListener("click", function () {
+      setDigest(!$("#digest-banner").classList.contains("show"));
     });
-
-    $("#btn-digest-skip").addEventListener("click", () => {
-      $("#digest-banner").style.display = "none";
-      toast("已跳过本期总结，下期再说。");
+    $("#btn-digest-skip").addEventListener("click", function () {
+      setDigest(false);
+      markHomeDigest("已跳过", true);
+      toast("这期先跳过。");
     });
-
-    $("#btn-digest-forward").addEventListener("click", () => {
-      openChannels();
-    });
+    $("#btn-digest-forward").addEventListener("click", openChannels);
 
     $("#btn-send").addEventListener("click", sendChat);
-    $("#chat-input").addEventListener("keydown", (e) => {
+    $("#chat-input").addEventListener("keydown", function (e) {
       if (e.key === "Enter") sendChat();
     });
 
-    // 信笺分段
-    $all("#notes-seg button").forEach((b) => {
-      b.addEventListener("click", () => {
-        $all("#notes-seg button").forEach((x) => x.classList.remove("active"));
-        b.classList.add("active");
-        const seg = b.dataset.seg;
-        $("#notes-inbox").style.display = seg === "inbox" ? "block" : "none";
-        $("#notes-outbox").style.display = seg === "outbox" ? "block" : "none";
-      });
-    });
-
-    $all("[data-resp]").forEach((btn) => {
-      btn.addEventListener("click", () => {
+    $all("[data-resp]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
         const map = {
-          later: "好，稍后回应。对方只会看到「稍后」。",
-          reply: "已记下你的一句回复（Demo：不真发）。",
-          invite: "已发出「邀请一起聊」示意（需双方同意）。",
+          later: "好，先放着。对方只会看到「稍后」。",
+          reply: "记下了你的一句回复。这里不会真的发出去。",
+          invite: "已发出「一起聊」的示意。要双方都愿意。",
         };
         toast(map[btn.dataset.resp]);
-        $("#note-incoming").querySelector(".tag").textContent =
-          btn.dataset.resp === "later" ? "稍后" : "已回应";
-        $("#note-incoming").querySelector(".tag").className =
-          "tag " + (btn.dataset.resp === "later" ? "tag-mute" : "tag-warm");
+        const tag = $("#note-incoming .tag");
+        const later = btn.dataset.resp === "later";
+        tag.textContent = later ? "稍后" : "已回应";
+        tag.className = "tag " + (later ? "tag-mute" : "tag-cyan");
         $("#notes-dot").style.display = "none";
+        const homeTag = $("#home-note-tag");
+        homeTag.textContent = tag.textContent;
+        homeTag.className = tag.className;
+        $("#btn-home-note").classList.add("is-done");
+        refreshTodoCount();
       });
     });
 
-    // 开关
-    $all(".switch").forEach((sw) => {
-      sw.addEventListener("click", () => {
+    $all(".switch").forEach(function (sw) {
+      sw.addEventListener("click", function () {
         const on = !sw.classList.contains("on");
         sw.classList.toggle("on", on);
         sw.setAttribute("aria-pressed", on ? "true" : "false");
         if (sw.dataset.sw === "call-out") {
           state.callOutEnabled = on;
-          toast(on ? "已开启：允许小间代打电话（发）" : "已关闭代打电话");
+          toast(on ? "已允许小间代打电话。每次仍要再确认。" : "已关闭代打电话");
         } else if (sw.id === "sw-phone-default") {
-          toast(on ? "电话代转默认：开（仍需当次确认）" : "电话代转默认：关");
+          toast(on ? "电话代转默认开了。每次还是要再确认。" : "电话代转保持默认关");
         }
       });
     });
 
     $("#btn-open-channels").addEventListener("click", openChannels);
     $("#sheet-close").addEventListener("click", closeChannels);
-    $("#sheet-channels").addEventListener("click", (e) => {
+    $("#sheet-channels").addEventListener("click", function (e) {
       if (e.target === $("#sheet-channels")) closeChannels();
     });
 
-    $all("[data-ch]").forEach((btn) => {
-      btn.addEventListener("click", () => {
+    $all("[data-ch]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
         const ch = btn.dataset.ch;
         if (ch === "call") {
-          if (!state.callOutEnabled) {
-            toast("示意：通道矩阵里「代打电话」仍关，但可预览来电界面");
-          }
+          if (!state.callOutEnabled) toast("代打电话还关着。先看看来电长什么样。");
           openCall();
           return;
         }
         closeChannels();
-        $("#digest-banner").style.display = "none";
+        setDigest(false);
         const labels = {
-          note: "短笺已进入待确认（Demo 不真发）。可在信笺箱查看。",
-          voice: "语音代转草稿已生成（Demo）。",
-          pause: "已建议暂停冷却。到点会轻问是否整理修复句。",
+          note: "短笺进了待确认。这里不会真的发出去。",
+          voice: "语音代转先放成草稿。",
+          pause: "先暂停。到点再问要不要整理一句台阶。",
         };
         toast(labels[ch] || "已选择");
-        if (ch === "note" || ch === "voice") switchTab("notes");
+        if (ch === "note" || ch === "voice") {
+          markHomeDigest(ch === "note" ? "已转达" : "语音草稿", true);
+          switchTab("notes");
+        } else {
+          markHomeDigest("先暂停", true);
+        }
       });
     });
 
-    $("#call-reject").addEventListener("click", () => {
+    $("#call-reject").addEventListener("click", function () {
       $("#call-actions").style.display = "none";
       $("#call-script").style.display = "none";
       $("#call-decline").classList.add("show");
     });
-    $("#call-accept").addEventListener("click", () => {
-      toast("示意：已接通。通话结束后双方可见摘要（非倾诉原文）。");
+    $("#call-accept").addEventListener("click", function () {
+      toast("接通了。结束后双方只看到摘要，看不到树洞原文。");
       closeCall();
       switchTab("notes");
     });
-    $("#call-done").addEventListener("click", () => {
+    $("#call-done").addEventListener("click", function () {
       closeCall();
       switchTab("notes");
-      toast("未接已降级：留言 + 短笺留档。");
+      toast("未接已改成留言和短笺。");
     });
 
-    $("#btn-retro").addEventListener("click", () => {
-      toast("复盘卡示意：触发点 / 需求 / 有效通道 / 下次小事。双方确认才写入小约定。");
+    $("#btn-retro").addEventListener("click", function () {
+      toast("复盘卡：触发点、需求、哪种说法有用。双方都点头，才写进小约定。");
     });
   }
 
-  /* init */
   tickClock();
   setInterval(tickClock, 30000);
   syncPersonaUI();
   bind();
-  // 默认展示总结条入口提示：树洞里点「本期总结」
 })();
