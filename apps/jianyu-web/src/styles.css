@@ -1070,6 +1070,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 }
 .letter-actions button:active { transform: scale(0.97); }
 .letter-actions.pair { display: grid; grid-template-columns: 1fr 1fr; }
+.letter-actions.pair button { height: 48px; font-size: 15px; }
 .letter-actions.pair .outline {
   background: transparent;
   color: var(--ink);
@@ -1388,6 +1389,16 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  flex: none;
+}
+.incoming-actions .cta,
+.incoming-actions .cta.ghost {
+  flex: none;
+  width: 100%;
+  height: 54px;
+}
+.incoming-actions .cta.ghost {
+  box-shadow: inset 0 0 0 1.5px rgba(20, 18, 15, 0.78);
 }
 .text-btn {
   margin-top: 4px;

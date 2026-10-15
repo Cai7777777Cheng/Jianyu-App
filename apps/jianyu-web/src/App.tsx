@@ -558,7 +558,6 @@ export default function App() {
   function allowCalls() {
     setCallsEnabled(true);
     setSheet(null);
-    ping("小周允许了。来电上的名字是小间。");
   }
 
   function declineCalls() {
