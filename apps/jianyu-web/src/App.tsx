@@ -66,14 +66,14 @@ function pad(n: number) {
 
 function IconHome() {
   return (
-    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="0.6" strokeLinejoin="round">
       <path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1z" />
     </svg>
   );
 }
 function IconHub() {
   return (
-    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="0.6">
       <rect x="3.5" y="3.5" width="7" height="7" rx="2" />
       <rect x="13.5" y="3.5" width="7" height="7" rx="2" />
       <rect x="3.5" y="13.5" width="7" height="7" rx="2" />
@@ -83,7 +83,7 @@ function IconHub() {
 }
 function IconCal() {
   return (
-    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="0.6">
       <rect x="3.5" y="5" width="17" height="15" rx="2" />
       <path d="M3.5 10h17M8 3.5v3M16 3.5v3" />
     </svg>
@@ -91,7 +91,7 @@ function IconCal() {
 }
 function IconMe() {
   return (
-    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="0.6" strokeLinecap="round">
       <circle cx="12" cy="8" r="3.2" />
       <path d="M5.5 19.2c1.2-3 3.5-4.5 6.5-4.5s5.3 1.5 6.5 4.5" />
     </svg>
@@ -99,14 +99,14 @@ function IconMe() {
 }
 function IconBack() {
   return (
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="0.73" strokeLinecap="round">
       <path d="M15 5 8 12l7 7" />
     </svg>
   );
 }
 function IconMic() {
   return (
-    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#fff" strokeWidth="0.6" strokeLinecap="round">
       <rect x="9" y="3" width="6" height="11" rx="3" />
       <path d="M6 11a6 6 0 0 0 12 0M12 17v3" />
     </svg>
@@ -114,7 +114,7 @@ function IconMic() {
 }
 function IconArrow() {
   return (
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" strokeWidth="0.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M5 12h12M13 6l6 6-6 6" />
     </svg>
   );
@@ -127,7 +127,7 @@ function MoodFace({ state }: { state: Resolve }) {
     <svg viewBox="0 0 24 24" aria-hidden="true">
       {state === "open" ? (
         <>
-          <path d="M6.5 8.5 9.5 10M9.5 8.5 6.5 10M14.5 8.5 17.5 10M17.5 8.5 14.5 10" fill="none" stroke="#111" strokeWidth="1.5" strokeLinecap="round" />
+          <path d="M6.5 8.5 9.5 10M9.5 8.5 6.5 10M14.5 8.5 17.5 10M17.5 8.5 14.5 10" fill="none" stroke="#111" strokeWidth="0.5" strokeLinecap="round" />
         </>
       ) : (
         <>
@@ -135,7 +135,7 @@ function MoodFace({ state }: { state: Resolve }) {
           <circle cx="15.8" cy="10" r="1.15" fill="#111" />
         </>
       )}
-      <path d={mouth} fill="none" stroke="#111" strokeWidth="1.6" strokeLinecap="round" />
+      <path d={mouth} fill="none" stroke="#111" strokeWidth="0.53" strokeLinecap="round" />
     </svg>
   );
 }
@@ -362,14 +362,14 @@ export default function App() {
               <rect x="10" y="2" width="3" height="10" rx="0.6" />
               <rect x="15" y="0" width="3" height="12" rx="0.6" />
             </svg>
-            <svg viewBox="0 0 16 12" width="15" height="12" fill="none" stroke="#111" strokeWidth="1.6" strokeLinecap="round">
+            <svg viewBox="0 0 16 12" width="15" height="12" fill="none" stroke="#111" strokeWidth="0.53" strokeLinecap="round">
               <path d="M1 4.6c3.2-2.6 10.8-2.6 14 0" />
               <path d="M3.5 7.2c2.2-1.7 6.8-1.7 9 0" />
             </svg>
             <svg viewBox="0 0 25 12" width="24" height="12">
-              <rect x="0.7" y="0.7" width="20" height="10.6" rx="2.2" fill="none" stroke="#111" strokeWidth="1.3" />
+              <rect x="0.7" y="0.7" width="20" height="10.6" rx="2.2" fill="none" stroke="#111" strokeWidth="0.43" />
               <rect x="2.4" y="2.4" width="15" height="7.2" rx="1" />
-              <path d="M23 4.2v3.6" stroke="#111" strokeWidth="1.6" strokeLinecap="round" />
+              <path d="M23 4.2v3.6" stroke="#111" strokeWidth="0.53" strokeLinecap="round" />
             </svg>
           </span>
         </header>
@@ -426,25 +426,37 @@ export default function App() {
               <p className="page-sub">同一件事，选一块说出去。</p>
               <div className="bento">
                 <button className="tile tile-tree" type="button" onClick={() => openSub("tree")}>
-                  <span className="kicker">私密</span>
-                  <span className="tile-title">树洞</span>
-                  <span className="tile-desc">说给小间听，默认不转给对方。</span>
+                  <img className="tile-art" src="/channels/tree.png" alt="" draggable={false} />
+                  <span className="tile-copy">
+                    <span className="kicker">私密</span>
+                    <span className="tile-title">树洞</span>
+                    <span className="tile-desc">说给小间听，默认不转给对方。</span>
+                  </span>
                 </button>
                 <button className="tile tile-note" type="button" onClick={() => openSub("letters")}>
-                  <span className="kicker">信件</span>
-                  <span className="tile-title">信札</span>
-                  <span className="tile-desc">短笺和回应</span>
+                  <img className="tile-art" src="/channels/letters.png" alt="" draggable={false} />
+                  <span className="tile-copy">
+                    <span className="kicker">信件</span>
+                    <span className="tile-title">信札</span>
+                    <span className="tile-desc">短笺和回应</span>
+                  </span>
                 </button>
                 <button className="tile tile-voice" type="button" onClick={() => openSub("composer")}>
-                  <span className="kicker">整理</span>
-                  <span className="tile-title">短笺</span>
-                  <span className="tile-desc">收成一句需求</span>
+                  <img className="tile-art" src="/channels/voice.png" alt="" draggable={false} />
+                  <span className="tile-copy">
+                    <span className="kicker">整理</span>
+                    <span className="tile-title">语音</span>
+                    <span className="tile-desc">收成一句需求</span>
+                  </span>
                 </button>
               </div>
               <button className="tile tile-phone" type="button" onClick={() => setSheet({ kind: "phone" })}>
-                <span className="kicker">需当次确认</span>
-                <span className="tile-title">电话</span>
-                <span className="tile-desc">小间用自己的名字打。没接就改短笺，不连着打。</span>
+                <img className="tile-art" src="/channels/phone.png" alt="" draggable={false} />
+                <span className="tile-copy">
+                  <span className="kicker">需当次确认</span>
+                  <span className="tile-title">电话</span>
+                  <span className="tile-desc">小间用自己的名字打。没接就改短笺，不连着打。</span>
+                </span>
               </button>
             </div>
           </section>
