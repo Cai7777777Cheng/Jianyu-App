@@ -10,8 +10,6 @@ import {
   FREQS,
   FIRM_REPLY,
   GOLDEN_CARD,
-  GOLDEN_LINE,
-  HEARD,
   NAMES,
   NEED_THRESHOLD,
   PARTNER,
@@ -20,10 +18,9 @@ import {
   SEED_NEED_HISTORY,
   SEED_NEED_TODAY,
   SEED_TREE,
+  SOFT_CHECKIN,
   SOFT_REPLIES,
   STATE_LABEL,
-  VENT_CHIPS,
-  VENT_COMPANION,
   asideFor,
   bumpNeed,
   callScript,
@@ -37,7 +34,6 @@ import {
   noteFromConvey,
   relayLines,
   relayText,
-  replyFor,
   tierFor,
   type DayNote,
   type EmotionCard,
@@ -51,7 +47,6 @@ type View =
   | "hub"
   | "cal"
   | "me"
-  | "tree"
   | "letters"
   | "draft"
   | "preview"
@@ -74,7 +69,7 @@ type Sheet =
   | { kind: "demo-call-confirm" }
   | { kind: "call-confirm"; enter: boolean }
   | { kind: "need-ask" }
-  | { kind: "need-gap" }
+  | { kind: "call-empty" }
   | null;
 
 const ASK_KEY = "jianyu-need-asked";
@@ -127,18 +122,19 @@ function cloneDays() {
 
 function IconHome() {
   return (
-    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="0.6" strokeLinejoin="round">
-      <path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1z" />
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="0.6" strokeLinecap="round">
+      <circle cx="12" cy="12" r="7.2" />
+      <circle cx="9.4" cy="11" r="0.7" fill="currentColor" stroke="none" />
+      <circle cx="14.6" cy="11" r="0.7" fill="currentColor" stroke="none" />
+      <path d="M9.2 14.2c.9.9 4.7.9 5.6 0" />
     </svg>
   );
 }
 function IconHub() {
   return (
-    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="0.6">
-      <rect x="3.5" y="3.5" width="7" height="7" rx="2" />
-      <rect x="13.5" y="3.5" width="7" height="7" rx="2" />
-      <rect x="3.5" y="13.5" width="7" height="7" rx="2" />
-      <rect x="13.5" y="13.5" width="7" height="7" rx="2" />
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="0.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5 12h11" />
+      <path d="M12 6.5 17.5 12 12 17.5" />
     </svg>
   );
 }
@@ -167,7 +163,7 @@ function IconBack() {
 }
 function IconMic() {
   return (
-    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#fff" strokeWidth="0.6" strokeLinecap="round">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
       <rect x="9" y="3" width="6" height="11" rx="3" />
       <path d="M6 11a6 6 0 0 0 12 0M12 17v3" />
     </svg>
@@ -179,6 +175,21 @@ function IconArrow() {
       <path d="M5 12h12M13 6l6 6-6 6" />
     </svg>
   );
+}
+
+/** 倾诉旁白最多每三张卡一句。 */
+function sparseAsides(lines: Msg[]): Msg[] {
+  let me = 0;
+  const out: Msg[] = [];
+  for (const line of lines) {
+    if (line.role === "me") {
+      me += 1;
+      out.push(line);
+      continue;
+    }
+    if (me > 0 && me % 3 === 0) out.push(line);
+  }
+  return out;
 }
 
 function tagClass(status: string) {
@@ -202,7 +213,6 @@ export default function App() {
   const [ventOnly, setVentOnly] = useState(false);
   const [listening, setListening] = useState(false);
   const [draft, setDraft] = useState("");
-  const [treeDraft, setTreeDraft] = useState("");
   const [messages, setMessages] = useState<Msg[]>([]);
   const [letters, setLetters] = useState<Letter[]>(SEED_LETTERS);
   const [box, setBox] = useState<"in" | "out">("in");
@@ -228,12 +238,13 @@ export default function App() {
   const [needScore, setNeedScore] = useState(SEED_NEED_TODAY);
   const [needHistory, setNeedHistory] = useState(() => SEED_NEED_HISTORY.map((item) => ({ ...item })));
   const [needChartOpen, setNeedChartOpen] = useState(false);
+  const [needDetail, setNeedDetail] = useState(false);
+  const [moreFor, setMoreFor] = useState<string | null>(null);
   const [askedDay, setAskedDay] = useState<number | null>(readAsked);
   const [toast, setToast] = useState("");
   const [toastOn, setToastOn] = useState(false);
   const [clock, setClock] = useState("9:41");
   const [pop, setPop] = useState(0);
-  const heardI = useRef(0);
   const msgId = useRef(1);
   const noteSeq = useRef(3);
   const temperRef = useRef(temper);
@@ -245,19 +256,17 @@ export default function App() {
   const scoreRef = useRef(needScore);
   const askedRef = useRef(askedDay);
   const voiceSeen = useRef(false);
+  const holdRef = useRef<number | null>(null);
   const floatRef = useRef<HTMLDivElement>(null);
   const logRef = useRef<HTMLDivElement>(null);
-  const bubbleRef = useRef<HTMLDivElement>(null);
   const stats = monthStats(days);
   const face = faceById(listening ? "listen" : shown);
   const isTab = (TABS as string[]).includes(view);
-  const homeLines = messages.slice(-2);
   const fresh = letters.find((item) => item.fresh);
   const script = card ? callScript(card, name) : "";
   const guides = guidesFor(name, PARTNER);
   const tier = tierFor(needScore);
   const needReady = needScore >= NEED_THRESHOLD;
-  const needGap = Math.max(0, NEED_THRESHOLD - needScore);
 
   useEffect(() => {
     temperRef.current = temper;
@@ -321,20 +330,6 @@ export default function App() {
   }, [askedDay]);
 
   useEffect(() => {
-    if (view !== "hub") return;
-    if (scoreRef.current < NEED_THRESHOLD) return;
-    if (askedRef.current === DEMO_TODAY) return;
-    const id = window.setTimeout(() => {
-      if (viewRef.current !== "hub") return;
-      if (scoreRef.current < NEED_THRESHOLD) return;
-      if (askedRef.current === DEMO_TODAY) return;
-      markAsked();
-      setSheet({ kind: "need-ask" });
-    }, 700);
-    return () => window.clearTimeout(id);
-  }, [view, needScore, askedDay]);
-
-  useEffect(() => {
     if (view !== "voice") {
       voiceSeen.current = false;
       return;
@@ -345,7 +340,6 @@ export default function App() {
   }, [view]);
 
   useEffect(() => {
-    bubbleRef.current?.scrollTo({ top: 9999 });
     logRef.current?.scrollTo({ top: 9999 });
   }, [messages, view]);
 
@@ -410,22 +404,25 @@ export default function App() {
     setMessages((list) => [...list, { id, day: DEMO_TODAY, role, text, tint, at }]);
   }
 
-  function speak(text: string, opts?: { source?: "home" | "tree"; chip?: boolean }) {
+  function speak(text: string, opts?: { source?: NeedSource; chip?: boolean }) {
     const value = text.trim();
     if (!value) return;
-    const source = opts?.source ?? (viewRef.current === "tree" ? "tree" : "home");
+    const source = opts?.source ?? "tree";
     const chip = opts?.chip === true;
     const vent = ventRef.current;
     const faceId = vent ? temperRef.current : faceFor(value, temperRef.current);
     const tint = faceById(faceId).tint;
     const nextCard = vent || chip ? null : cardFromText(value);
+    const priorMe = SEED_TREE.filter((line) => line.role === "me").length + messages.filter((line) => line.role === "me").length;
+    const sayAside = (priorMe + 1) % 3 === 0;
     pushLine("me", value, tint, "刚刚");
     setShown(faceId);
+    setListening(false);
     setPop((n) => n + 1);
     raiseNeed(source, value, vent);
-    const bot = source === "tree" ? asideFor(value, vent) : replyFor(value, faceId, vent);
+    const bot = asideFor(value, vent);
     window.setTimeout(() => {
-      pushLine("bot", bot, "#ffffff");
+      if (sayAside) pushLine("bot", bot, "#ffffff");
       if (nextCard) {
         setCard(nextCard);
         setOffer(true);
@@ -435,9 +432,6 @@ export default function App() {
         setChipFlash((n) => n + 1);
       }
     }, 420);
-    window.setTimeout(() => {
-      if (!listenRef.current) setShown(temperRef.current);
-    }, 880);
   }
 
   function acceptNeedAsk() {
@@ -445,35 +439,53 @@ export default function App() {
     setSheet({ kind: "call-confirm", enter: true });
   }
 
-  function onNeedCard() {
-    if (scoreRef.current >= NEED_THRESHOLD) setSheet({ kind: "need-ask" });
-    else setSheet({ kind: "need-gap" });
+  function declineNeedAsk() {
+    const source = card ?? { ...GOLDEN_CARD };
+    setSheet(null);
+    enterPreview(source);
   }
 
-  function startListen() {
-    if (listenRef.current) return;
-    setListening(true);
-    setShown("listen");
-    setPop((n) => n + 1);
-    window.setTimeout(() => {
-      if (!listenRef.current) return;
-      const line = HEARD[heardI.current % HEARD.length];
-      heardI.current += 1;
+  function openCallTile() {
+    if (!card) {
+      setSheet({ kind: "call-empty" });
+      return;
+    }
+    setSheet({ kind: "call-confirm", enter: false });
+  }
+
+  function holdNeedStart() {
+    if (holdRef.current) window.clearTimeout(holdRef.current);
+    holdRef.current = window.setTimeout(() => setNeedDetail(true), 520);
+  }
+
+  function holdNeedEnd() {
+    if (holdRef.current) window.clearTimeout(holdRef.current);
+    holdRef.current = null;
+  }
+
+  function toggleListen() {
+    if (listenRef.current) {
       setListening(false);
-      speak(line, { source: viewRef.current === "tree" ? "tree" : "home" });
-    }, 900);
+      return;
+    }
+    setListening(true);
+    setPop((n) => n + 1);
   }
 
   function onHelp(e: FormEvent) {
     e.preventDefault();
-    if (listening) return;
-    if (!draft.trim()) {
-      startListen();
+    const value = draft.trim();
+    if (listening && !value) {
+      setListening(false);
       return;
     }
-    const value = draft;
+    if (!value) {
+      toggleListen();
+      return;
+    }
     setDraft("");
-    speak(value, { source: "home" });
+    setListening(false);
+    speak(value, { source: "tree" });
   }
 
   function deliver(source: EmotionCard, status: string, meta: string, reply: string) {
@@ -546,7 +558,6 @@ export default function App() {
   function allowCalls() {
     setCallsEnabled(true);
     setSheet(null);
-    ping("小周允许了。来电上的名字是小间。");
   }
 
   function declineCalls() {
@@ -610,7 +621,8 @@ export default function App() {
     setGuideOpen(false);
     setTogetherOpen(false);
     setDraft("");
-    setTreeDraft("");
+    setNeedDetail(false);
+    setMoreFor(null);
     scoreRef.current = SEED_NEED_TODAY;
     askedRef.current = null;
     setNeedScore(SEED_NEED_TODAY);
@@ -622,7 +634,7 @@ export default function App() {
     } catch {
       /* private mode */
     }
-    ping("演示回到开头。来电仍然关着。今天的分数回到 78。");
+    ping("演示回到开头。来电仍然关着。");
     goTab("home");
   }
 
@@ -640,18 +652,21 @@ export default function App() {
 
   const cells: Array<number | null> = [...Array.from({ length: CAL_LEAD }, () => null), ...Array.from({ length: CAL_DAYS }, (_, i) => i + 1)];
   const dayNote = (day: number) => days.find((d) => d.day === day);
-  const treeLines = [...SEED_TREE, ...messages];
-  const treeGroups = Array.from(
-    treeLines.reduce((map, line) => {
+  const journalLines = [...SEED_TREE, ...messages];
+  const shownJournal = sparseAsides(journalLines);
+  const journalGroups = Array.from(
+    shownJournal.reduce((map, line) => {
       const list = map.get(line.day) ?? [];
       list.push(line);
       map.set(line.day, list);
       return map;
     }, new Map<number, Msg[]>()),
   ).sort((a, b) => a[0] - b[0]);
-  function treeOn(day: number) {
-    return treeGroups.find(([d]) => d === day)?.[1] ?? [];
+  function ventsOn(day: number) {
+    return journalLines.filter((line) => line.day === day && line.role === "me");
   }
+  const canSend = draft.trim().length > 0;
+  const heroFace = listening ? faceById("listen") : face;
   const shownCard = guideCard ?? card;
   function renderGuideExtras() {
     return (
@@ -696,7 +711,7 @@ export default function App() {
       <p className="stage-hint">
         间语 · 阿宁 / 小周
         <br />
-        树洞里怎么说都行。分数到了，小间才会问要不要打。
+        先被小间接住，再决定要不要轻轻递出去。
       </p>
       <div className="phone" data-temper={listening ? "listen" : shown}>
         <header className="status">
@@ -723,40 +738,63 @@ export default function App() {
 
         <div className="app">
           <section className={view === "home" ? "screen on" : "screen"}>
-            <div className="home">
+            <div className="home vent-home">
               <div className="home-top">
                 <div>
                   <h1 className="greet">
                     {greet(name)}
-                    <br />
-                    今天感觉怎么样？
+                    <span className="greet-soft">想说就说，不说也行。</span>
                   </h1>
-                  <span className="mood">{face.name}</span>
+                  <span className="mood presence">小间在</span>
                 </div>
-                <button className="month-link" type="button" onClick={() => goTab("cal")} aria-label="日历">
+                <button className="month-link" type="button" onClick={() => goTab("cal")} aria-label="痕迹">
                   <IconCal />
-                  <span>本月</span>
+                  <span>痕迹</span>
                 </button>
               </div>
-              <div className="hero-zone">
+              <div className={listening ? "half-hero listening" : "half-hero"}>
                 <div className="halo" aria-hidden="true" />
                 <div className={listening ? "float listening" : "float"} ref={floatRef}>
                   <div className="sway">
-                    <img alt={`小间 · ${face.name}`} src={face.src} draggable={false} />
+                    <img alt="小间" src={heroFace.src} draggable={false} />
                   </div>
                 </div>
               </div>
-              <div className="bubbles" aria-live="polite" ref={bubbleRef}>
-                {homeLines.map((m) => (
-                  <div key={m.id} className={m.role === "me" ? "bubble me" : "bubble bot"} style={m.role === "me" ? { background: m.tint } : undefined}>
-                    {m.text}
+              <div className="vent-log home-log" ref={logRef}>
+                {journalGroups.map(([day, lines]) => (
+                  <div key={day} className="day-group">
+                    <div className="day-label soft">{daySoftLabel(day)}</div>
+                    {lines.map((m) =>
+                      m.role === "me" ? (
+                        <article key={m.id} className="journal-card" style={{ background: m.tint }}>
+                          {m.at ? <time>{m.at}</time> : null}
+                          <p>{m.text}</p>
+                        </article>
+                      ) : (
+                        <p key={m.id} className="aside-line">
+                          {m.text}
+                        </p>
+                      ),
+                    )}
                   </div>
                 ))}
+                {messages.every((m) => m.role !== "me") ? <p className="vent-empty">今天的话会留在这里。</p> : null}
               </div>
-              <div className="dock-stack">
+              <div className="dock-stack home-dock">
+                <button
+                  className={ventOnly ? "vent-quiet on" : "vent-quiet"}
+                  type="button"
+                  aria-pressed={ventOnly}
+                  onClick={() => {
+                    setVentOnly((v) => !v);
+                    ping(!ventOnly ? "今天只倒在这里，不收成卡。" : "要不要让小周知道，你再定。");
+                  }}
+                >
+                  {ventOnly ? "今天只倒，不递出" : "只倒给小间"}
+                </button>
                 {messages.length === 0 ? (
-                  <button className="suggest" type="button" onClick={() => speak(GOLDEN_LINE, { source: "home" })}>
-                    {GOLDEN_LINE}
+                  <button className="suggest" type="button" onClick={() => speak(SOFT_CHECKIN, { source: "home", chip: true })}>
+                    {SOFT_CHECKIN}
                   </button>
                 ) : null}
                 {offer && card && !ventOnly && !chipHidden ? (
@@ -803,13 +841,17 @@ export default function App() {
                 <form className={listening ? "help listening" : "help"} onSubmit={onHelp}>
                   <input
                     value={draft}
-                    placeholder={listening ? "在听…" : "跟小间说说"}
+                    placeholder={listening ? "在听…" : "说给小间"}
                     autoComplete="off"
                     enterKeyHint="send"
                     onChange={(e) => setDraft(e.target.value)}
                   />
-                  <button className={listening ? "help-go hot" : "help-go"} type="submit" aria-label={draft.trim() ? "发送" : "说话"}>
-                    {draft.trim() && !listening ? <IconArrow /> : <IconMic />}
+                  <button
+                    className={canSend ? "help-go send" : listening ? "help-go mic hot" : "help-go mic"}
+                    type="submit"
+                    aria-label={canSend ? "发送" : listening ? "停止" : "说话"}
+                  >
+                    {canSend ? <IconArrow /> : <IconMic />}
                   </button>
                 </form>
               </div>
@@ -818,116 +860,79 @@ export default function App() {
 
           <section className={view === "hub" ? "screen on" : "screen"}>
             <div className="scroll">
-              <h1 className="page-title">交流</h1>
-              <p className="page-sub">同一件事，选一条路说出去。</p>
-              <div className="bento">
-                <button className="tile tile-tree" type="button" onClick={() => openSub("tree")}>
-                  <img className="tile-art" src="/channels/tree.png" alt="" draggable={false} />
-                  <span className="tile-copy">
-                    <span className="kicker">只倒给小间</span>
-                    <span className="tile-title">树洞</span>
-                    <span className="tile-desc">说给小间的话，按天留在这里。</span>
-                  </span>
-                </button>
+              <h1 className="page-title">递出</h1>
+              <p className="page-sub">信札，或一通很短的来电。</p>
+              <div className="bento bento-two">
                 <button className="tile tile-note" type="button" onClick={() => openSub("letters")}>
                   <img className="tile-art" src="/channels/letters.png" alt="" draggable={false} />
                   <span className="tile-copy">
-                    <span className="kicker">日常说清</span>
                     <span className="tile-title">信札</span>
-                    <span className="tile-desc">短笺。可以回「我收到了」，或「这几天再聊」。</span>
+                    <span className="tile-desc">低承诺回一句。</span>
                   </span>
                 </button>
-                <button className="tile tile-voice" type="button" onClick={() => openSub("voice")}>
-                  <img className="tile-art" src="/channels/voice.png" alt="" draggable={false} />
+                <button className="tile tile-call" type="button" onClick={openCallTile}>
+                  <img className="tile-art" src="/channels/phone.png" alt="" draggable={false} />
                   <span className="tile-copy">
-                    <span className="kicker">想听语气</span>
-                    <span className="tile-title">语音</span>
-                    <span className="tile-desc">小间把情绪卡读出来。</span>
+                    <span className="tile-title">小间来电</span>
+                    <span className="tile-desc">很短，默认关着。</span>
                   </span>
                 </button>
               </div>
-              <article className={`need-card tier-${tier.id}`} onClick={onNeedCard}>
-                <div className="need-top">
-                  <img className="need-face" alt="" src={faceById(tier.face).src} draggable={false} />
-                  <div>
-                    <div className="kicker">小间来电</div>
-                    <b className="need-tier">
-                      <i className={tier.id} />
-                      {tier.label}
-                    </b>
-                    <p className="need-line">{tier.line}</p>
-                  </div>
-                </div>
-                <div className="need-meter">
-                  <div className="need-bar" aria-hidden="true">
-                    <div className="need-fill" style={{ width: `${Math.max(0, Math.min(100, needScore))}%` }} />
-                    <i className="need-mark" style={{ left: `${NEED_THRESHOLD}%` }} />
-                  </div>
-                  <b className="need-score">
-                    {needScore}/{NEED_THRESHOLD}
-                  </b>
-                </div>
-                <button
-                  className="need-trend"
-                  type="button"
-                  aria-expanded={needChartOpen}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setNeedChartOpen((open) => !open);
-                  }}
+              <div className={`need-soft tier-${tier.id}`}>
+                {needReady ? (
+                  <button className="ask-chip" type="button" onClick={() => setSheet({ kind: "need-ask" })}>
+                    小间想问你一声
+                  </button>
+                ) : (
+                  <p className="need-stage">{tier.label}</p>
+                )}
+                <div
+                  className="need-glow"
+                  onPointerDown={holdNeedStart}
+                  onPointerUp={holdNeedEnd}
+                  onPointerLeave={holdNeedEnd}
+                  onPointerCancel={holdNeedEnd}
                 >
-                  {needChartOpen ? "收起趋势" : "看趋势"}
-                </button>
-                {needChartOpen ? (
-                  <div
-                    onClick={(e) => {
-                      e.stopPropagation();
-                    }}
+                  <div className="need-glow-fill" style={{ width: `${Math.max(8, Math.min(100, needScore))}%` }} />
+                </div>
+                <div className="need-meta">
+                  <button className="need-detail" type="button" onClick={() => setNeedDetail((open) => !open)}>
+                    {needDetail ? "收起" : "详情"}
+                  </button>
+                  <button
+                    className="need-trend"
+                    type="button"
+                    aria-expanded={needChartOpen}
+                    onClick={() => setNeedChartOpen((open) => !open)}
                   >
+                    {needChartOpen ? "收起" : "近几天"}
+                  </button>
+                </div>
+                {needDetail ? (
+                  <p className="need-secret">
+                    {needScore} · 问你的线在 {NEED_THRESHOLD}
+                  </p>
+                ) : null}
+                {needChartOpen ? (
+                  <div>
                     <NeedChart points={needHistory} />
-                    <p className="need-chart-note">近 7 日 · 横线是阈值</p>
+                    <p className="need-chart-note">近几天</p>
                   </div>
                 ) : null}
-                <div className="need-actions">
-                  <button
-                    className="need-quiet"
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openSub("tree");
-                    }}
-                  >
-                    先树洞再说
-                  </button>
-                  {needReady ? (
-                    <button
-                      className="need-go"
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSheet({ kind: "need-ask" });
-                      }}
-                    >
-                      要不要打
-                    </button>
-                  ) : null}
-                </div>
-              </article>
+              </div>
             </div>
           </section>
 
           <section className={view === "cal" ? "screen on" : "screen"}>
             <div className="scroll">
-              <h1 className="page-title">情绪日历</h1>
+              <h1 className="page-title">痕迹</h1>
               <p className="page-sub">
-                {CAL_YEAR}年{CAL_MONTH}月
-                <br />
-                {stats.total === 0 ? "这个月还没记下什么。" : "点某一天，再看约定和当天树洞。"}
+                {stats.total === 0 ? "这个月还没记下什么。" : `${CAL_YEAR}年${CAL_MONTH}月 · 点一天看疏通状态`}
               </p>
               <div className="legend">
                 <i className="done">已疏通</i>
-                <i className="part">部分</i>
-                <i className="open">未解决</i>
+                <i className="part">说了一半</i>
+                <i className="open">还闷着</i>
               </div>
               <div className="week">
                 {"日一二三四五六".split("").map((d) => (
@@ -962,7 +967,7 @@ export default function App() {
                   <div className="kicker">本月回顾</div>
                   <h2>说开了</h2>
                   <p>
-                    {stats.total} 件里说开了 {stats.done} 件。{stats.part} 件通了一半，{stats.open} 件还想着。
+                    {stats.total} 件里说开了 {stats.done} 件。{stats.part} 件说了一半，{stats.open} 件还闷着。
                   </p>
                   <div className="stats">
                     <div>
@@ -971,11 +976,11 @@ export default function App() {
                     </div>
                     <div>
                       <b>{stats.part}</b>
-                      <span>通了一半</span>
+                      <span>说了一半</span>
                     </div>
                     <div>
                       <b>{stats.open}</b>
-                      <span>还想着</span>
+                      <span>还闷着</span>
                     </div>
                   </div>
                 </section>
@@ -986,7 +991,7 @@ export default function App() {
           <section className={view === "me" ? "screen on" : "screen"}>
             <div className="scroll">
               <h1 className="page-title">我的</h1>
-              <p className="page-sub">点一只，首页的小间和颜色一起换。</p>
+              <p className="page-sub">点一只，小间的样子和颜色一起换。</p>
               <div className="temper-grid">
                 {FACES.map((f) => (
                   <button
@@ -1000,7 +1005,7 @@ export default function App() {
                       setShown(f.id);
                       setListening(false);
                       setPop((n) => n + 1);
-                      ping(`首页已换成「${f.name}」。`);
+                      ping(`小间已换成「${f.name}」。`);
                     }}
                   >
                     <img src={f.src} alt="" draggable={false} />
@@ -1050,7 +1055,7 @@ export default function App() {
                 >
                   <span>
                     <b>暂停主动找我</b>
-                    <small>首页仍然可以说话</small>
+                    <small>小间里仍然可以说话</small>
                   </span>
                   <span className={paused ? "switch on" : "switch"}>
                     <i />
@@ -1064,106 +1069,6 @@ export default function App() {
                 演示来电
               </button>
             </div>
-          </section>
-
-          <section className={view === "tree" ? "screen on vent-space" : "screen vent-space"}>
-            <header className="subhead vent-head">
-              <button className="back" type="button" aria-label="返回" onClick={back}>
-                <IconBack />
-              </button>
-              <div className="subhead-text">
-                <h1>树洞</h1>
-              </div>
-              <button
-                className={ventOnly ? "vent-toggle on" : "vent-toggle"}
-                type="button"
-                aria-pressed={ventOnly}
-                onClick={() => {
-                  setVentOnly((v) => !v);
-                  ping(!ventOnly ? "今天只倒，不收成卡。" : "要不要让小周知道，你再定。");
-                }}
-              >
-                今天只倒，不收成卡
-              </button>
-            </header>
-            <div className={listening ? "vent-hero listening" : "vent-hero"}>
-              <div className="vent-halo" aria-hidden="true" />
-              <img className="vent-face" alt="小间在听" src="/xiaojian/listen.png" draggable={false} />
-              <p className="vent-companion">{VENT_COMPANION}</p>
-            </div>
-            <div className="vent-log" ref={logRef}>
-              {treeGroups.map(([day, lines]) => (
-                <div key={day} className="day-group">
-                  <div className="day-label soft">{daySoftLabel(day)}</div>
-                  {lines.map((m) =>
-                    m.role === "me" ? (
-                      <article key={m.id} className="journal-card" style={{ background: m.tint }}>
-                        {m.at ? <time>{m.at}</time> : null}
-                        <p>{m.text}</p>
-                      </article>
-                    ) : (
-                      <p key={m.id} className="aside-line">
-                        <span>小间轻轻</span>
-                        {m.text}
-                      </p>
-                    ),
-                  )}
-                </div>
-              ))}
-              {messages.every((m) => m.role !== "me") ? <p className="vent-empty">今天还没说。点下面一句，或者直接说给小间。</p> : null}
-            </div>
-            <div className="vent-chips">
-              {VENT_CHIPS.map((chip) => (
-                <button key={chip} className="vent-chip" type="button" onClick={() => speak(chip, { source: "tree", chip: true })}>
-                  {chip}
-                </button>
-              ))}
-            </div>
-            {offer && card && !ventOnly && !chipHidden ? (
-              <div className={chipPulse ? "chip-row tree pulse" : "chip-row tree"} key={`tree-${chipFlash}`} onAnimationEnd={() => setChipPulse(false)}>
-                <button className="card-chip" type="button" onClick={() => openSub("draft")}>
-                  <span>
-                    <b>{chipSoft ? "还有一张未看的卡" : "收成一张卡？"}</b>
-                    <small>小间整理好了 · 要不要看看</small>
-                  </span>
-                </button>
-                <button
-                  className="chip-dismiss"
-                  type="button"
-                  onClick={() => {
-                    setChipHidden(true);
-                    setChipSoft(true);
-                    setChipPulse(false);
-                  }}
-                >
-                  先放下
-                </button>
-              </div>
-            ) : null}
-            <form
-              className={listening ? "vent-composer listening" : "vent-composer"}
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (listening) return;
-                if (!treeDraft.trim()) {
-                  startListen();
-                  return;
-                }
-                speak(treeDraft, { source: "tree" });
-                setTreeDraft("");
-              }}
-            >
-              <input
-                value={treeDraft}
-                placeholder={listening ? "在听…" : "说给小间"}
-                autoComplete="off"
-                enterKeyHint="send"
-                onChange={(e) => setTreeDraft(e.target.value)}
-              />
-              <button className={listening ? "help-go hot" : "help-go"} type="submit" aria-label={treeDraft.trim() ? "发送" : "说话"}>
-                {treeDraft.trim() && !listening ? <IconArrow /> : <IconMic />}
-              </button>
-            </form>
           </section>
 
           <section className={view === "draft" ? "screen on" : "screen"}>
@@ -1206,11 +1111,11 @@ export default function App() {
                       onClick={() => {
                         setCard(null);
                         setOffer(false);
-                        ping("留在树洞了。");
+                        ping("留在小间了。");
                         back();
                       }}
                     >
-                      只留树洞
+                      只留在小间
                     </button>
                     <button className="cta ghost" type="button" onClick={() => enterPreview()}>
                       想让小周知道
@@ -1218,7 +1123,7 @@ export default function App() {
                   </div>
                 </>
               ) : (
-                <p className="empty">还没有情绪卡。先在树洞或首页说一句。</p>
+                <p className="empty">还没有情绪卡。先在小间说一句。</p>
               )}
             </div>
           </section>
@@ -1289,6 +1194,9 @@ export default function App() {
                   >
                     {channel === "call" && callArmed ? `确认请小间打给${PARTNER}` : channel === "letter" ? `放进${PARTNER}的信札` : "先选一种送达"}
                   </button>
+                  <button className="text-btn hear" type="button" onClick={() => openSub("voice")}>
+                    听小间读一遍
+                  </button>
                 </>
               ) : (
                 <p className="empty">还没有可以送出的卡。</p>
@@ -1303,11 +1211,9 @@ export default function App() {
               </button>
               <div className="subhead-text">
                 <h1>信札</h1>
-                <p>{lens === "ning" ? `${name}的信札` : `${PARTNER}的手机 · 看到的是短笺`}</p>
+                <p>{lens === "ning" ? `${name}的信札` : `${PARTNER}看到的短笺`}</p>
               </div>
-            </header>
-            <div className="scroll tight">
-              <div className="seg">
+              <div className="who-switch" role="tablist" aria-label="看谁的信札">
                 <button type="button" className={lens === "ning" ? "on" : ""} onClick={() => setLens("ning")}>
                   {name}
                 </button>
@@ -1315,7 +1221,9 @@ export default function App() {
                   {PARTNER}
                 </button>
               </div>
-              <div className="seg">
+            </header>
+            <div className="scroll tight">
+              <div className="seg seg-lite">
                 <button type="button" className={box === "in" ? "on" : ""} onClick={() => setBox("in")}>
                   收到
                 </button>
@@ -1344,19 +1252,25 @@ export default function App() {
                   ) : null}
                   {canReply(n) ? (
                     <>
-                      <div className="letter-actions">
-                        {SOFT_REPLIES.map((reply) => (
-                          <button key={reply} type="button" onClick={() => replyTo(n.id, reply)}>
-                            {reply}
-                          </button>
-                        ))}
-                      </div>
-                      <div className="letter-actions firm">
-                        <button className="ghosty" type="button" onClick={() => replyTo(n.id, FIRM_REPLY)}>
-                          今晚可以
+                      <div className="letter-actions pair">
+                        <button className="solid" type="button" onClick={() => replyTo(n.id, "我收到了")}>
+                          我收到了
                         </button>
+                        <button className="outline" type="button" onClick={() => replyTo(n.id, "这几天再聊")}>
+                          这几天再聊
+                        </button>
+                      </div>
+                      <div className="letter-links">
+                        <button className="letter-link" type="button" onClick={() => setMoreFor((id) => (id === n.id ? null : n.id))}>
+                          {moreFor === n.id ? "收起" : "更多"}
+                        </button>
+                        {moreFor === n.id ? (
+                          <button className="letter-link" type="button" onClick={() => replyTo(n.id, FIRM_REPLY)}>
+                            今晚可以
+                          </button>
+                        ) : null}
                         <button
-                          className="ghosty"
+                          className="letter-link later"
                           type="button"
                           onClick={() => {
                             setLetters((list) => list.map((item) => (item.id === n.id ? { ...item, status: "稍后再看" } : item)));
@@ -1380,7 +1294,7 @@ export default function App() {
                 type="button"
                 onClick={() => enterPreview(card ?? { ...GOLDEN_CARD })}
               >
-                {card ? "用这张情绪卡写短笺" : "用演示卡写一封"}
+                写一封短笺
               </button>
             </div>
           </section>
@@ -1391,8 +1305,8 @@ export default function App() {
                 <IconBack />
               </button>
               <div className="subhead-text">
-                <h1>语音</h1>
-                <p>小间把心情读出来</p>
+                <h1>听一遍</h1>
+                <p>小间读这张卡</p>
               </div>
             </header>
             <div className="scroll tight">
@@ -1411,10 +1325,7 @@ export default function App() {
                   <button
                     className="cta"
                     type="button"
-                    onClick={() => {
-                      if (!playing) raiseNeed("voice");
-                      setPlaying((v) => !v);
-                    }}
+                    onClick={() => setPlaying((v) => !v)}
                   >
                     {playing ? "停一下" : "让小间读一遍"}
                   </button>
@@ -1424,12 +1335,9 @@ export default function App() {
                 </>
               ) : (
                 <>
-                  <p className="empty">还没有情绪卡。可以先用阿宁这张演示，或回树洞说一句。</p>
-                  <button className="cta" type="button" onClick={() => setCard({ ...GOLDEN_CARD })}>
-                    用演示的一张
-                  </button>
-                  <button className="cta ghost" type="button" onClick={() => openSub("tree")}>
-                    去树洞说
+                  <p className="empty">还没有可以读的卡。先在小间说一句，或写一封短笺。</p>
+                  <button className="cta ghost" type="button" onClick={() => goTab("home")}>
+                    回小间
                   </button>
                 </>
               )}
@@ -1447,14 +1355,8 @@ export default function App() {
               <h1>小间</h1>
               <p className="precall">{PRECALL_LINE}</p>
               <div className="incoming-actions">
-                <button className="cta" type="button" onClick={answerCall} disabled={sheet?.kind === "permit"}>
-                  接通
-                </button>
-                <button className="cta ghost" type="button" onClick={laterCall} disabled={sheet?.kind === "permit"}>
-                  稍后
-                </button>
                 <button
-                  className="cta ghost"
+                  className="cta"
                   type="button"
                   disabled={sheet?.kind === "permit"}
                   onClick={() => {
@@ -1465,8 +1367,14 @@ export default function App() {
                 >
                   改看信札
                 </button>
-                <button className="text-btn" type="button" disabled={sheet?.kind === "permit"} onClick={missedCall}>
-                  这会儿没接
+                <button className="cta ghost" type="button" onClick={laterCall} disabled={sheet?.kind === "permit"}>
+                  稍后
+                </button>
+                <button className="incoming-answer" type="button" onClick={answerCall} disabled={sheet?.kind === "permit"}>
+                  接通
+                </button>
+                <button className="text-btn plain" type="button" disabled={sheet?.kind === "permit"} onClick={missedCall}>
+                  这会儿不方便
                 </button>
               </div>
             </div>
@@ -1713,9 +1621,9 @@ export default function App() {
           <nav className={isTab ? "tabbar" : "tabbar hide"} role="tablist">
             {(
               [
-                ["home", "首页", <IconHome key="h" />],
-                ["hub", "交流", <IconHub key="u" />],
-                ["cal", "日历", <IconCal key="c" />],
+                ["home", "小间", <IconHome key="h" />],
+                ["hub", "递出", <IconHub key="u" />],
+                ["cal", "痕迹", <IconCal key="c" />],
                 ["me", "我的", <IconMe key="m" />],
               ] as const
             ).map(([id, label, icon]) => (
@@ -1742,7 +1650,7 @@ export default function App() {
               <div className="sheet-panel" role="dialog" aria-modal="true">
                 <div className="grab" />
                 {sheet.kind === "day" && dayNote(sheet.day) ? (
-                  <DaySheet note={dayNote(sheet.day) as DayNote} lines={treeOn(sheet.day)} onClose={() => setSheet(null)} />
+                  <DaySheet note={dayNote(sheet.day) as DayNote} lines={ventsOn(sheet.day)} onClose={() => setSheet(null)} />
                 ) : null}
                 {sheet.kind === "permit" ? (
                   <>
@@ -1813,69 +1721,52 @@ export default function App() {
                 ) : null}
                 {sheet.kind === "need-ask" ? (
                   <>
-                    <p className="kicker">
-                      小间来电 · {needScore}/{NEED_THRESHOLD}
-                    </p>
-                    <h2>要不要让小间代打电话？</h2>
-                    <p className="lead">这几天的话已经攒到可以问你了。来电默认关着，第一次仍会问对方允不允许。</p>
-                    <p className="sheet-note">不答应就改成信札，不会再打。</p>
+                    <p className="kicker">小间</p>
+                    <h2>要不要让小间打个很短的电话？</h2>
+                    <p className="lead">不同意就写成信札。来电默认关着，第一次仍会问对方允不允许。</p>
+                    <div className="sheet-actions">
+                      <button className="ghost" type="button" onClick={declineNeedAsk}>
+                        写成信札
+                      </button>
+                      <button className="cta" type="button" onClick={acceptNeedAsk}>
+                        可以，打个很短的
+                      </button>
+                    </div>
+                  </>
+                ) : null}
+                {sheet.kind === "call-empty" ? (
+                  <>
+                    <h2>先有一句，再决定打不打</h2>
+                    <p className="lead">来电默认关着。可以先回小间说，或写成短笺。</p>
                     <div className="sheet-actions">
                       <button
                         className="ghost"
                         type="button"
                         onClick={() => {
                           setSheet(null);
-                          openSub("tree");
+                          goTab("home");
                         }}
                       >
-                        先树洞再说
+                        回小间
                       </button>
-                      <button className="cta" type="button" onClick={acceptNeedAsk}>
-                        要小间打
-                      </button>
-                    </div>
-                  </>
-                ) : null}
-                {sheet.kind === "need-gap" ? (
-                  <>
-                    <p className="kicker">
-                      {tier.label} · {needScore}/{NEED_THRESHOLD}
-                    </p>
-                    <h2>还差 {needGap} 分</h2>
-                    <p className="lead">{tier.line}。这会儿不能直接打，先在树洞说就好。</p>
-                    <div className="sheet-actions">
-                      <button
-                        className="cta"
-                        type="button"
-                        onClick={() => {
-                          setSheet(null);
-                          openSub("tree");
-                        }}
-                      >
-                        先树洞再说
+                      <button className="cta" type="button" onClick={() => enterPreview({ ...GOLDEN_CARD })}>
+                        写一封短笺
                       </button>
                     </div>
                   </>
                 ) : null}
                 {sheet.kind === "demo-call" ? (
                   <>
-                    <h2>还没有情绪卡</h2>
-                    <p className="lead">没有卡的时候，不能直接打过去。不确定就用信札。先去树洞说一句。</p>
+                    <h2>演示一通来电</h2>
+                    <p className="lead">来电默认关着。对方第一次仍会问允不允许。不想打，就写成短笺。</p>
                     <div className="sheet-actions">
-                      <button
-                        className="cta"
-                        type="button"
-                        onClick={() => {
-                          setSheet(null);
-                          openSub("tree");
-                        }}
-                      >
-                        先去树洞说
+                      <button className="ghost" type="button" onClick={() => keepLetter({ ...GOLDEN_CARD })}>
+                        写成短笺
+                      </button>
+                      <button className="cta" type="button" onClick={() => setSheet({ kind: "demo-call-confirm" })}>
+                        看这通来电
                       </button>
                     </div>
-                    <button className="text-btn" type="button" onClick={() => setSheet({ kind: "demo-call-confirm" })}>
-                      用演示卡（会走来电）
-                    </button>
                   </>
                 ) : null}
                 {sheet.kind === "demo-call-confirm" || sheet.kind === "call-confirm" ? (
@@ -1916,23 +1807,19 @@ export default function App() {
 
 function NeedChart({ points }: { points: { day: number; score: number }[] }) {
   const w = 320;
-  const h = 96;
+  const h = 72;
   const padX = 18;
-  const padTop = 12;
-  const padBot = 18;
-  const innerH = h - padTop - padBot;
+  const y = 28;
   const xAt = (i: number) => (points.length <= 1 ? w / 2 : padX + (i * (w - padX * 2)) / (points.length - 1));
-  const yAt = (score: number) => padTop + (1 - Math.max(0, Math.min(100, score)) / 100) * innerH;
-  const line = points.map((p, i) => `${i === 0 ? "M" : "L"}${xAt(i).toFixed(1)},${yAt(p.score).toFixed(1)}`).join(" ");
-  const yMark = yAt(NEED_THRESHOLD);
+  const line = points.map((_, i) => `${i === 0 ? "M" : "L"}${xAt(i).toFixed(1)},${y}`).join(" ");
+  const max = Math.max(...points.map((p) => p.score), 1);
   return (
-    <svg className="need-chart" viewBox={`0 0 ${w} ${h}`} role="img" aria-label={`近7日需要分数，阈值 ${NEED_THRESHOLD}`}>
-      <line className="need-chart-mark" x1={padX} x2={w - padX} y1={yMark} y2={yMark} />
+    <svg className="need-chart" viewBox={`0 0 ${w} ${h}`} role="img" aria-label="近几天">
       <path className="need-chart-line" d={line} />
       {points.map((p, i) => (
         <g key={p.day}>
-          <circle className="need-chart-dot" cx={xAt(i)} cy={yAt(p.score)} r="3.2" />
-          <text className="need-chart-label" x={xAt(i)} y={h - 4} textAnchor="middle">
+          <circle className="need-chart-dot" cx={xAt(i)} cy={y} r="4" opacity={0.35 + (p.score / max) * 0.65} />
+          <text className="need-chart-label" x={xAt(i)} y={h - 8} textAnchor="middle">
             {p.day}
           </text>
         </g>
