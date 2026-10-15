@@ -1,6 +1,22 @@
-# 间语 · 静态 Demo
+# 间语
 
-可双击打开的手机框交互示意，对齐《间语 · App 功能框架》与 UX v2：底部五栏、树洞定期总结授权转达、信笺箱、完整形象、通道菜单与小间电话边界。
+## Vite 原型
+
+产品界面在 `apps/jianyu-web`。白底、粗黑标题、粉彩卡片、黑底栏；首页放大锁定裁切的小间 PNG，输入和语音都留在这一屏。底栏是首页、交流、日历、我的。
+
+```bash
+cd apps/jianyu-web
+npm i
+npm run dev
+```
+
+浏览器打开终端里的地址，默认 http://127.0.0.1:5173 。生产构建是 `npm run build`。
+
+同一套界面的离线页是根目录 `index4.0.html`，双击即可（`file://`），不经过 Vite。
+
+## 静态 Demo
+
+可双击打开的手机框交互示意，对齐《间语 · App 功能框架》与 UX v2：底部五栏、树洞定期总结授权转达、信笺箱、完整形象、通道菜单与小间电话边界。`index.html` 与 `index3.1.html` 都还在，互不覆盖。
 
 **无真实后端、无 LLM API、无微信接入。** 全部为前端 mock。
 
@@ -21,6 +37,9 @@ python3 -m http.server 8765
 
 | 文件 | 说明 |
 |------|------|
+| `apps/jianyu-web/` | Vite + React 原型，`npm i && npm run dev` |
+| `index4.0.html` | 与 Vite 同一套界面的离线页（`styles4.0.css`、`app4.0.js`） |
+| `index3.1.html` | 3.1：PNG 小间，三栏，首页原地说话 |
 | `index.html` | 单页结构（手机框 + 五栏 + 浮层） |
 | `styles.css` | 温暖平静视觉 |
 | `app.js` | Tab / 认识小间 / 树洞 / 通道 / 来电等交互 |
