@@ -20,8 +20,14 @@ export const FREQS = ["很少开口", "刚好就好", "多关心一点"];
 export const NAMES = ["阿宁", "你", "宁"];
 export const HEARD = ["有点闷", "谢谢，我好一点了", "你先听我说"];
 export const PARTNER = "小周";
-export const LIGHT_REPLIES = ["我收到了", "今晚可以"] as const;
+/** 低承诺主推。今晚可以仍可用，但是次按钮。 */
+export const SOFT_REPLIES = ["我收到了", "这几天再聊"] as const;
+export const FIRM_REPLY = "今晚可以";
 export const GOLDEN_LINE = "连续两天很少回我，我有点不安";
+
+export function isLightReply(reply: string) {
+  return reply === "我收到了" || reply === "这几天再聊" || reply === FIRM_REPLY;
+}
 
 /** 演示月历里，这条传达写在 15 日。 */
 export const DEMO_TODAY = 15;
@@ -116,7 +122,7 @@ export function guidesFor(name: string, partner: string): Guide[] {
       who: partner,
       tone: "zhou",
       title: "这是在说需要，不是在定罪",
-      step: "先回一句「我收到了」或「今晚可以」，再决定有没有 10 分钟。",
+      step: "先回「我收到了」或「这几天再聊」；今晚有空再点「今晚可以」。",
       check: "想解释之前，先用自己的话复述对方的需要。",
     },
   ];
@@ -186,6 +192,7 @@ export function monthStats(days: DayNote[]) {
 
 export function noteFromConvey(card: EmotionCard, reply: string): DayNote {
   const agreed = reply.includes("今晚可以");
+  const soon = reply.includes("这几天");
   const heard = reply.includes("收到");
   const together = reply.includes("一起");
   let state: Resolve = "open";
@@ -196,9 +203,12 @@ export function noteFromConvey(card: EmotionCard, reply: string): DayNote {
   } else if (agreed) {
     state = "part";
     result = "小周回了「今晚可以」。两边各留了一小步，还没聊完。";
+  } else if (soon) {
+    state = "part";
+    result = "对方认收到了，约这几天再找时间。";
   } else if (heard) {
     state = "part";
-    result = "小周回了「我收到了」。先确认收到，时间还没定。";
+    result = "先确认收到，时间还没定。";
   }
   return {
     day: DEMO_TODAY,

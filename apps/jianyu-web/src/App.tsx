@@ -8,19 +8,21 @@ import {
   DEMO_TODAY,
   FACES,
   FREQS,
+  FIRM_REPLY,
   GOLDEN_CARD,
   GOLDEN_LINE,
   HEARD,
-  LIGHT_REPLIES,
   NAMES,
   PARTNER,
   SEED_LETTERS,
+  SOFT_REPLIES,
   STATE_LABEL,
   callScript,
   cardFromText,
   faceById,
   faceFor,
   guidesFor,
+  isLightReply,
   monthStats,
   noteFromConvey,
   relayLines,
@@ -43,6 +45,7 @@ type View =
   | "preview"
   | "incoming"
   | "call"
+  | "delivered"
   | "guide"
   | "together"
   | "voice";
@@ -56,6 +59,8 @@ type Sheet =
   | { kind: "permit" }
   | { kind: "miss" }
   | { kind: "demo-call" }
+  | { kind: "demo-call-confirm" }
+  | { kind: "call-confirm"; enter: boolean }
   | null;
 
 const TABS: Tab[] = ["home", "hub", "cal", "me"];
@@ -184,6 +189,15 @@ export default function App() {
   const [callSec, setCallSec] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [zhouNod, setZhouNod] = useState(false);
+  const [partnerReply, setPartnerReply] = useState("");
+  const [callArmed, setCallArmed] = useState(false);
+  const [chipHidden, setChipHidden] = useState(false);
+  const [chipSoft, setChipSoft] = useState(false);
+  const [chipFlash, setChipFlash] = useState(0);
+  const [chipPulse, setChipPulse] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
+  const [togetherOpen, setTogetherOpen] = useState(false);
   const [sheet, setSheet] = useState<Sheet>(null);
   const [toast, setToast] = useState("");
   const [toastOn, setToastOn] = useState(false);
@@ -281,6 +295,7 @@ export default function App() {
     if ((TABS as string[]).includes(next)) setTab(next as Tab);
     if (next !== "call") setCallSec(0);
     if (next !== "voice") setPlaying(false);
+    if (next === "home" && viewRef.current !== "home") setChipHidden(false);
   }
   function goTab(next: Tab) {
     setStack([]);
@@ -315,7 +330,6 @@ export default function App() {
     const faceId = vent ? temperRef.current : faceFor(value, temperRef.current);
     const tint = faceById(faceId).tint;
     const nextCard = vent ? null : cardFromText(value);
-    const from = viewRef.current;
     pushLine("me", value, tint);
     setShown(faceId);
     setPop((n) => n + 1);
@@ -324,14 +338,14 @@ export default function App() {
       if (nextCard) {
         setCard(nextCard);
         setOffer(true);
+        setChipHidden(false);
+        setChipSoft(false);
+        setChipPulse(true);
+        setChipFlash((n) => n + 1);
       }
     }, 420);
     window.setTimeout(() => {
       if (!listenRef.current) setShown(temperRef.current);
-      if (nextCard) {
-        setStack((s) => [...s, from]);
-        show("draft");
-      }
     }, 880);
   }
 
@@ -361,7 +375,7 @@ export default function App() {
     speak(value);
   }
 
-  function deliver(source: EmotionCard, status: string, meta: string, reply: string, dest: "guide" | "letters") {
+  function deliver(source: EmotionCard, status: string, meta: string, reply: string) {
     const id = "n" + noteSeq.current++;
     const letter: Letter = {
       id,
@@ -377,18 +391,40 @@ export default function App() {
     setLetters((list) => [letter, ...list.map((item) => ({ ...item, fresh: false }))]);
     setGuideCard(source);
     setOffer(false);
+    setPartnerReply(isLightReply(reply) ? reply : "");
+    setGuideOpen(false);
+    setTogetherOpen(false);
+    setZhouNod(false);
+    setCallArmed(false);
     setDays((list) => list.map((d) => (d.day === DEMO_TODAY ? noteFromConvey(source, reply) : d)));
     setLens("zhou");
     setBox("in");
-    if (source.conflict && dest === "guide") land("guide");
+    if (source.conflict) land("delivered");
     else land("letters");
   }
 
-  function openPreview(pref: Channel | null, source?: EmotionCard) {
+  function enterPreview(source?: EmotionCard) {
     if (source) setCard(source);
-    setChannel(pref);
+    setChannel("letter");
+    setCallArmed(false);
     setSheet(null);
-    openSub("preview");
+    if (viewRef.current !== "preview") openSub("preview");
+  }
+
+  function armCall(source?: EmotionCard) {
+    if (source) setCard(source);
+    setChannel("call");
+    setCallArmed(true);
+    setSheet(null);
+    if (viewRef.current !== "preview") openSub("preview");
+  }
+
+  function keepLetter(source?: EmotionCard) {
+    if (source) setCard(source);
+    setChannel("letter");
+    setCallArmed(false);
+    setSheet(null);
+    if (viewRef.current !== "preview") openSub("preview");
   }
 
   function sendChosen() {
@@ -397,7 +433,7 @@ export default function App() {
       return;
     }
     if (channel === "letter") {
-      deliver(card, "待看", "短笺 · 小周还没回", "", "guide");
+      deliver(card, "待看", "短笺 · 小周还没回", "");
       ping("已放进小周的信札。对方看到的是这三句，不是原话。");
       return;
     }
@@ -415,7 +451,7 @@ export default function App() {
   function declineCalls() {
     if (!card) return;
     setSheet(null);
-    deliver(card, "已降级", "没有打开来电，改成了信札", "", "guide");
+    deliver(card, "已降级", "没有打开来电，改成了信札", "");
     ping("没打开来电。这句改成信札了，不会再打。");
   }
 
@@ -427,21 +463,22 @@ export default function App() {
 
   function laterCall() {
     if (!card) return;
-    deliver(card, "待看", "来电选了稍后，没有再打", "", "guide");
+    deliver(card, "待看", "来电选了稍后，没有再打", "");
     ping("已稍后。不会再打，短笺留在信札里。");
   }
 
   function missedCall() {
     if (!card) return;
-    deliver(card, "已降级", "没接到，已改成信札，没有再打", "", "guide");
+    deliver(card, "已降级", "没接到，已改成信札，没有再打", "");
     setSheet({ kind: "miss" });
   }
 
   function replyTo(id: string, reply: string) {
     setLetters((list) => list.map((item) => (item.id === id ? { ...item, status: "已回应", reply, fresh: true } : { ...item, fresh: false })));
     const item = letters.find((n) => n.id === id);
-    if (item?.box === "out" && guideCard && item.conflict) {
-      setDays((list) => list.map((d) => (d.day === DEMO_TODAY ? noteFromConvey(guideCard, reply) : d)));
+    if (item?.box === "out" && item.conflict) {
+      if (isLightReply(reply)) setPartnerReply(reply);
+      if (guideCard) setDays((list) => list.map((d) => (d.day === DEMO_TODAY ? noteFromConvey(guideCard, reply) : d)));
     }
     ping(`${lens === "zhou" ? "小周" : name}回了「${reply}」。`);
   }
@@ -460,8 +497,17 @@ export default function App() {
     setListening(false);
     setLens("ning");
     setBox("in");
-    setChannel(null);
+    setChannel("letter");
+    setCallArmed(false);
     setZhouNod(false);
+    setPartnerReply("");
+    setChipHidden(false);
+    setChipSoft(false);
+    setChipFlash(0);
+    setChipPulse(false);
+    setReviewOpen(false);
+    setGuideOpen(false);
+    setTogetherOpen(false);
     setDraft("");
     setTreeDraft("");
     ping("演示回到开头。来电仍然关着。");
@@ -482,13 +528,51 @@ export default function App() {
 
   const cells: Array<number | null> = [...Array.from({ length: CAL_LEAD }, () => null), ...Array.from({ length: CAL_DAYS }, (_, i) => i + 1)];
   const dayNote = (day: number) => days.find((d) => d.day === day);
+  const shownCard = guideCard ?? card;
+  function renderGuideExtras() {
+    return (
+    <>
+      <p className="demo-bar">演示：两张并排。真用的时候，每人只看到自己的那张。</p>
+      {guides.map((g) => (
+        <article key={g.who} className={`guide-card ${g.tone}`}>
+          <div className="who">给{g.who}</div>
+          <h3>{g.title}</h3>
+          <div className="step-label">我可以做的一小步</div>
+          <p className="step">{g.step}</p>
+          <div className="step-label">送出去之前</div>
+          <p className="step">{g.check}</p>
+        </article>
+      ))}
+      {partnerReply ? (
+        <button className="fold inner" type="button" aria-expanded={togetherOpen} onClick={() => setTogetherOpen((v) => !v)}>
+          <span>若两边都回了一句，可邀请一起聊</span>
+          <small>{togetherOpen ? "收起" : "展开"}</small>
+        </button>
+      ) : (
+        <p className="lock-note">等对方回一句之后，再考虑要不要一起聊</p>
+      )}
+      {togetherOpen && partnerReply ? (
+        <button
+          className="cta"
+          type="button"
+          onClick={() => {
+            setZhouNod(false);
+            openSub("together");
+          }}
+        >
+          邀请一起聊 10 分钟
+        </button>
+      ) : null}
+    </>
+    );
+  }
 
   return (
     <div className="stage">
       <p className="stage-hint">
         间语 · 阿宁 / 小周
         <br />
-        树洞收成情绪卡，再选信札或小间来电。
+        说完先停在聊天里。想转达，再自己点开。
       </p>
       <div className="phone" data-temper={listening ? "listen" : shown}>
         <header className="status">
@@ -525,8 +609,9 @@ export default function App() {
                   </h1>
                   <span className="mood">{face.name}</span>
                 </div>
-                <button className="backlog" type="button" onClick={() => goTab("cal")}>
-                  还积着 {stats.open}
+                <button className="month-link" type="button" onClick={() => goTab("cal")} aria-label="日历">
+                  <IconCal />
+                  <span>本月</span>
                 </button>
               </div>
               <div className="hero-zone">
@@ -550,13 +635,30 @@ export default function App() {
                     {GOLDEN_LINE}
                   </button>
                 ) : null}
-                {offer && card ? (
-                  <button className="card-chip" type="button" onClick={() => openSub("draft")}>
-                    <span>
-                      <b>情绪卡好了</b>
-                      <small>还没决定要不要让{PARTNER}知道</small>
-                    </span>
-                  </button>
+                {offer && card && !ventOnly && !chipHidden ? (
+                  <div
+                    className={chipPulse ? "chip-row pulse" : "chip-row"}
+                    key={chipFlash}
+                    onAnimationEnd={() => setChipPulse(false)}
+                  >
+                    <button className="card-chip" type="button" onClick={() => openSub("draft")}>
+                      <span>
+                        <b>{chipSoft ? "还有一张未看的卡" : "情绪卡好了"}</b>
+                        <small>{chipSoft ? "想看的时候再点开" : `还没决定要不要让${PARTNER}知道`}</small>
+                      </span>
+                    </button>
+                    <button
+                      className="chip-dismiss"
+                      type="button"
+                      onClick={() => {
+                        setChipHidden(true);
+                        setChipSoft(true);
+                        setChipPulse(false);
+                      }}
+                    >
+                      先放下
+                    </button>
+                  </div>
                 ) : null}
                 {fresh ? (
                   <button
@@ -608,7 +710,7 @@ export default function App() {
                   <span className="tile-copy">
                     <span className="kicker">日常说清</span>
                     <span className="tile-title">信札</span>
-                    <span className="tile-desc">短笺。可以回「我收到了」。</span>
+                    <span className="tile-desc">短笺。可以回「我收到了」，或「这几天再聊」。</span>
                   </span>
                 </button>
                 <button className="tile tile-voice" type="button" onClick={() => openSub("voice")}>
@@ -621,19 +723,16 @@ export default function App() {
                 </button>
               </div>
               <button
-                className="tile tile-phone"
+                className="quiet-row"
                 type="button"
                 onClick={() => {
-                  if (card) openPreview("call");
+                  if (card) setSheet({ kind: "call-confirm", enter: true });
                   else setSheet({ kind: "demo-call" });
                 }}
               >
-                <img className="tile-art" src="/channels/phone.png" alt="" draggable={false} />
-                <span className="tile-copy">
-                  <span className="kicker">想被郑重听见</span>
-                  <span className="tile-title">小间来电</span>
-                  <span className="tile-desc">来电显示小间。默认关，第一次会问。</span>
-                </span>
+                <span className="kicker">需对方允许</span>
+                <b>小间来电</b>
+                <small>不确定就用信札。来电默认关，第一次会问。对方可以关掉，关掉就改信札，不连环打。</small>
               </button>
             </div>
           </section>
@@ -642,7 +741,9 @@ export default function App() {
             <div className="scroll">
               <h1 className="page-title">情绪日历</h1>
               <p className="page-sub">
-                {CAL_YEAR}年{CAL_MONTH}月 · 点开才看约定
+                {CAL_YEAR}年{CAL_MONTH}月
+                <br />
+                {stats.total === 0 ? "这个月还没记下什么。" : "点某一天，再看那天的约定。"}
               </p>
               <div className="legend">
                 <i className="done">已疏通</i>
@@ -673,27 +774,33 @@ export default function App() {
                   );
                 })}
               </div>
-              <section className="summary">
-                <div className="kicker">本月小结</div>
-                <h2>疏通了</h2>
-                <p>
-                  {stats.total} 件里说开了 {stats.done} 件。还积压 {stats.open} 件，{stats.part} 件只通了一半。
-                </p>
-                <div className="stats">
-                  <div>
-                    <b>{stats.rate}%</b>
-                    <span>疏通率</span>
+              <button className="fold" type="button" aria-expanded={reviewOpen} onClick={() => setReviewOpen((v) => !v)}>
+                <span>本月回顾</span>
+                <small>{reviewOpen ? "收起" : "展开"}</small>
+              </button>
+              {reviewOpen ? (
+                <section className="summary">
+                  <div className="kicker">本月回顾</div>
+                  <h2>说开了</h2>
+                  <p>
+                    {stats.total} 件里说开了 {stats.done} 件。{stats.part} 件通了一半，{stats.open} 件还想着。
+                  </p>
+                  <div className="stats">
+                    <div>
+                      <b>{stats.rate}%</b>
+                      <span>说开了</span>
+                    </div>
+                    <div>
+                      <b>{stats.part}</b>
+                      <span>通了一半</span>
+                    </div>
+                    <div>
+                      <b>{stats.open}</b>
+                      <span>还想着</span>
+                    </div>
                   </div>
-                  <div>
-                    <b>{stats.part}</b>
-                    <span>只通一半</span>
-                  </div>
-                  <div>
-                    <b>{stats.open}</b>
-                    <span>还积着</span>
-                  </div>
-                </div>
-              </section>
+                </section>
+              ) : null}
             </div>
           </section>
 
@@ -724,6 +831,22 @@ export default function App() {
               </div>
               <div className="sec">设置</div>
               <div className="set-card">
+                <button
+                  className="set-row"
+                  type="button"
+                  onClick={() => {
+                    setCallsEnabled((v) => !v);
+                    ping(!callsEnabled ? "已允许小间来电。" : "来电关了。下次打过来会再问一次。");
+                  }}
+                >
+                  <span>
+                    <b>允许小间来电</b>
+                    <small>默认关。不答应也不会被催，会改成信札</small>
+                  </span>
+                  <span className={callsEnabled ? "switch on" : "switch"}>
+                    <i />
+                  </span>
+                </button>
                 <button className="set-row" type="button" onClick={() => setSheet({ kind: "name" })}>
                   <span>
                     <b>怎么称呼你</b>
@@ -737,22 +860,6 @@ export default function App() {
                     <small>还是要你自己接话</small>
                   </span>
                   <span className="set-val">{freq}</span>
-                </button>
-                <button
-                  className="set-row"
-                  type="button"
-                  onClick={() => {
-                    setCallsEnabled((v) => !v);
-                    ping(!callsEnabled ? "已允许小间来电。" : "来电关了。下次打过来会再问一次。");
-                  }}
-                >
-                  <span>
-                    <b>允许小间来电</b>
-                    <small>默认关。关掉之后，下次会再问</small>
-                  </span>
-                  <span className={callsEnabled ? "switch on" : "switch"}>
-                    <i />
-                  </span>
                 </button>
                 <button
                   className="set-row"
@@ -825,6 +932,27 @@ export default function App() {
                 </div>
               ))}
             </div>
+            {offer && card && !ventOnly && !chipHidden ? (
+              <div className={chipPulse ? "chip-row tree pulse" : "chip-row tree"} key={`tree-${chipFlash}`} onAnimationEnd={() => setChipPulse(false)}>
+                <button className="card-chip" type="button" onClick={() => openSub("draft")}>
+                  <span>
+                    <b>{chipSoft ? "还有一张未看的卡" : "收成一张卡？"}</b>
+                    <small>小间整理好了 · 要不要看看</small>
+                  </span>
+                </button>
+                <button
+                  className="chip-dismiss"
+                  type="button"
+                  onClick={() => {
+                    setChipHidden(true);
+                    setChipSoft(true);
+                    setChipPulse(false);
+                  }}
+                >
+                  先放下
+                </button>
+              </div>
+            ) : null}
             <form
               className="help pad-help"
               onSubmit={(e) => {
@@ -879,7 +1007,7 @@ export default function App() {
                   </div>
                   <div className="choice-row">
                     <button
-                      className="cta ghost"
+                      className="cta"
                       type="button"
                       onClick={() => {
                         setCard(null);
@@ -890,7 +1018,7 @@ export default function App() {
                     >
                       只留树洞
                     </button>
-                    <button className="cta" type="button" onClick={() => openPreview(null)}>
+                    <button className="cta ghost" type="button" onClick={() => enterPreview()}>
                       想转达
                     </button>
                   </div>
@@ -937,19 +1065,35 @@ export default function App() {
                     <input value={card.need} onChange={(e) => setCard({ ...card, need: e.target.value })} />
                   </label>
                   <div className="chan-row">
-                    <button type="button" className={channel === "letter" ? "chan chan-letter on" : "chan chan-letter"} onClick={() => setChannel("letter")}>
-                      <span className="kicker">短笺</span>
+                    <button
+                      type="button"
+                      className={channel === "letter" ? "chan chan-letter on" : "chan chan-letter"}
+                      onClick={() => {
+                        setChannel("letter");
+                        setCallArmed(false);
+                      }}
+                    >
+                      <span className="kicker">短笺 · 默认</span>
                       <b>信札</b>
-                      <small>{PARTNER}可以回「我收到了」或「今晚可以」。</small>
+                      <small>{PARTNER}可以回「我收到了」或「这几天再聊」。</small>
                     </button>
-                    <button type="button" className={channel === "call" ? "chan chan-call on" : "chan chan-call"} onClick={() => setChannel("call")}>
-                      <span className="kicker">来电</span>
+                    <button
+                      type="button"
+                      className={channel === "call" && callArmed ? "chan chan-call on" : "chan chan-call"}
+                      onClick={() => setSheet({ kind: "call-confirm", enter: false })}
+                    >
+                      <span className="kicker">需对方允许</span>
                       <b>小间来电</b>
-                      <small>{callsEnabled ? "小周已允许来电。" : "默认关。第一次会问小周。"}</small>
+                      <small>不确定就用信札。点开会再确认一次。</small>
                     </button>
                   </div>
-                  <button className="cta" type="button" disabled={!channel || !card.feel.trim() || !card.need.trim()} onClick={sendChosen}>
-                    {channel === "call" ? `请小间打给${PARTNER}` : channel === "letter" ? `放进${PARTNER}的信札` : "先选一种送达"}
+                  <button
+                    className="cta"
+                    type="button"
+                    disabled={!(channel === "letter" || (channel === "call" && callArmed)) || !card.feel.trim() || !card.need.trim()}
+                    onClick={sendChosen}
+                  >
+                    {channel === "call" && callArmed ? `确认请小间打给${PARTNER}` : channel === "letter" ? `放进${PARTNER}的信札` : "先选一种送达"}
                   </button>
                 </>
               ) : (
@@ -995,31 +1139,52 @@ export default function App() {
                   <p>{n.body}</p>
                   <div className="meta">{n.meta}</div>
                   {n.reply ? <div className="meta">回了一句：{n.reply}</div> : null}
+                  {n.status === "稍后再看" && !n.reply ? (
+                    <button
+                      className="reopen"
+                      type="button"
+                      onClick={() => setLetters((list) => list.map((item) => (item.id === n.id ? { ...item, status: "待看" } : item)))}
+                    >
+                      再回一句
+                    </button>
+                  ) : null}
                   {canReply(n) ? (
-                    <div className="letter-actions">
-                      {LIGHT_REPLIES.map((reply) => (
-                        <button key={reply} type="button" onClick={() => replyTo(n.id, reply)}>
-                          {reply}
+                    <>
+                      <div className="letter-actions">
+                        {SOFT_REPLIES.map((reply) => (
+                          <button key={reply} type="button" onClick={() => replyTo(n.id, reply)}>
+                            {reply}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="letter-actions firm">
+                        <button className="ghosty" type="button" onClick={() => replyTo(n.id, FIRM_REPLY)}>
+                          今晚可以
                         </button>
-                      ))}
-                      <button
-                        className="ghosty"
-                        type="button"
-                        onClick={() => {
-                          setLetters((list) => list.map((item) => (item.id === n.id ? { ...item, status: "稍后再看" } : item)));
-                          ping("已放下。不会计时，也不会再催。");
-                        }}
-                      >
-                        稍后
-                      </button>
-                    </div>
+                        <button
+                          className="ghosty"
+                          type="button"
+                          onClick={() => {
+                            setLetters((list) => list.map((item) => (item.id === n.id ? { ...item, status: "稍后再看" } : item)));
+                            ping("已放下。不会计时，也不会再催。");
+                          }}
+                        >
+                          稍后
+                        </button>
+                      </div>
+                    </>
+                  ) : null}
+                  {n.reply && n.conflict && lens === "ning" && n.box === "out" && isLightReply(n.reply) ? (
+                    <button className="reopen" type="button" onClick={() => openSub("delivered")}>
+                      去已送达
+                    </button>
                   ) : null}
                 </article>
               ))}
               <button
                 className="cta ghost"
                 type="button"
-                onClick={() => openPreview("letter", card ?? { ...GOLDEN_CARD })}
+                onClick={() => enterPreview(card ?? { ...GOLDEN_CARD })}
               >
                 {card ? "用这张情绪卡写短笺" : "用演示卡写一封"}
               </button>
@@ -1052,7 +1217,7 @@ export default function App() {
                   <button className="cta" type="button" onClick={() => setPlaying((v) => !v)}>
                     {playing ? "停一下" : "让小间读一遍"}
                   </button>
-                  <button className="cta ghost" type="button" onClick={() => openPreview(null)}>
+                  <button className="cta ghost" type="button" onClick={() => enterPreview()}>
                     改用信札或来电送出
                   </button>
                 </>
@@ -1097,7 +1262,7 @@ export default function App() {
                   disabled={sheet?.kind === "permit"}
                   onClick={() => {
                     if (!card) return;
-                    deliver(card, "待看", "来电改看了信札", "", "guide");
+                    deliver(card, "待看", "来电改看了信札", "");
                     ping("改看信札了。没有继续打。");
                   }}
                 >
@@ -1121,7 +1286,7 @@ export default function App() {
                     back();
                     return;
                   }
-                  deliver(card, "待看", "来电接通了，还没回一句", "", "guide");
+                  deliver(card, "待看", "来电接通了，还没回一句", "");
                   ping("已挂断。没有录音。");
                 }}
               >
@@ -1146,25 +1311,37 @@ export default function App() {
                 {pad(Math.floor(callSec / 60))}:{pad(callSec % 60)}
               </div>
               <div className="call-actions">
-                {LIGHT_REPLIES.map((reply) => (
+                {SOFT_REPLIES.map((reply) => (
                   <button
                     key={reply}
                     className="cta"
                     type="button"
                     onClick={() => {
                       if (!card) return;
-                      deliver(card, "已回应", "来电里回的", reply, "guide");
+                      deliver(card, "已回应", "来电里回的", reply);
                     }}
                   >
                     {reply}
                   </button>
                 ))}
+              </div>
+              <div className="call-actions ghosts">
                 <button
                   className="cta ghost"
                   type="button"
                   onClick={() => {
                     if (!card) return;
-                    deliver(card, "待看", "来电改成了短笺", "", "guide");
+                    deliver(card, "已回应", "来电里回的", FIRM_REPLY);
+                  }}
+                >
+                  今晚可以
+                </button>
+                <button
+                  className="cta ghost"
+                  type="button"
+                  onClick={() => {
+                    if (!card) return;
+                    deliver(card, "待看", "来电改成了短笺", "");
                     ping("改成短笺了。");
                   }}
                 >
@@ -1175,13 +1352,66 @@ export default function App() {
                   type="button"
                   onClick={() => {
                     if (!card) return;
-                    deliver(card, "待看", "来电接通了，还没回一句", "", "guide");
+                    deliver(card, "待看", "来电接通了，还没回一句", "");
                     ping("已挂断。没有录音。");
                   }}
                 >
                   挂断
                 </button>
               </div>
+            </div>
+          </section>
+
+          <section className={view === "delivered" ? "screen on" : "screen"}>
+            <header className="subhead">
+              <button className="back" type="button" aria-label="回首页" onClick={() => goTab("home")}>
+                <IconBack />
+              </button>
+              <div className="subhead-text">
+                <h1>已送达</h1>
+                <p>对方看到的是这三句，不是原话</p>
+              </div>
+            </header>
+            <div className="scroll tight">
+              {shownCard ? (
+                <>
+                  <article className="delivered-card">
+                    <div className="kicker">已放进{PARTNER}的信札</div>
+                    <h2>先到这里</h2>
+                    <div className="relay">
+                      {relayLines(shownCard, name).map((line, i) => (
+                        <p key={i}>{line}</p>
+                      ))}
+                    </div>
+                    <p className="warn">{partnerReply ? `${PARTNER}回了「${partnerReply}」` : "还没回。不催。"}</p>
+                  </article>
+                  <button className="cta" type="button" onClick={() => goTab("home")}>
+                    回首页
+                  </button>
+                  <button
+                    className="cta ghost"
+                    type="button"
+                    onClick={() => {
+                      setLens("zhou");
+                      setBox("in");
+                      openSub("letters");
+                    }}
+                  >
+                    去信札看看
+                  </button>
+                  {shownCard.conflict ? (
+                    <>
+                      <button className="fold" type="button" aria-expanded={guideOpen} onClick={() => setGuideOpen((v) => !v)}>
+                        <span>可选：两边各一小步</span>
+                        <small>{guideOpen ? "收起" : "展开"}</small>
+                      </button>
+                      {guideOpen ? renderGuideExtras() : null}
+                    </>
+                  ) : null}
+                </>
+              ) : (
+                <p className="empty">还没有送出的短笺。</p>
+              )}
             </div>
           </section>
 
@@ -1196,27 +1426,7 @@ export default function App() {
               </div>
             </header>
             <div className="scroll tight">
-              <p className="guide-note">演示里两张并排。真用的时候，每人只看到自己的那张，也看不到对方的树洞原话。</p>
-              {guides.map((g) => (
-                <article key={g.who} className={`guide-card ${g.tone}`}>
-                  <div className="who">给{g.who}</div>
-                  <h3>{g.title}</h3>
-                  <div className="step-label">我可以做的一小步</div>
-                  <p className="step">{g.step}</p>
-                  <div className="step-label">送出去之前</div>
-                  <p className="step">{g.check}</p>
-                </article>
-              ))}
-              <button
-                className="cta"
-                type="button"
-                onClick={() => {
-                  setZhouNod(false);
-                  openSub("together");
-                }}
-              >
-                邀请一起聊 10 分钟
-              </button>
+              {renderGuideExtras()}
               <button
                 className="cta ghost"
                 type="button"
@@ -1258,11 +1468,16 @@ export default function App() {
                   {name}已准备
                   <small>用「我感到…我需要…」</small>
                 </div>
-                <button type="button" className={zhouNod ? "nod on" : "nod"} onClick={() => setZhouNod(true)}>
-                  {zhouNod ? `${PARTNER}也愿意` : `请${PARTNER}点头`}
-                  <small>{zhouNod ? "两边都到了" : "还差这一边"}</small>
-                </button>
+                <div className={zhouNod ? "nod on" : "nod"}>
+                  {zhouNod ? `${PARTNER}也愿意` : `已邀请，${PARTNER}可自己决定`}
+                  <small>{zhouNod ? "两边都到了" : "不催。对方可以不来。"}</small>
+                </div>
               </div>
+              {zhouNod ? null : (
+                <button className="text-btn demo-nod" type="button" onClick={() => setZhouNod(true)}>
+                  演示：{PARTNER}自己愿意
+                </button>
+              )}
               {zhouNod && card ? (
                 <>
                   <article className="line-card">
@@ -1292,7 +1507,7 @@ export default function App() {
                 </>
               ) : (
                 <p className="empty">
-                  {zhouNod ? "还没有可以记的卡。" : `${PARTNER}还没点头。点上面那一格，演示里就算两边都到了。`}
+                  {zhouNod ? "还没有可以记的卡。" : `已邀请。${PARTNER}可以自己决定，不来也没关系。`}
                 </p>
               )}
             </div>
@@ -1320,6 +1535,10 @@ export default function App() {
                 className="sheet-dim"
                 onClick={() => {
                   if (sheet.kind === "permit") return;
+                  if (sheet.kind === "call-confirm" || sheet.kind === "demo-call-confirm") {
+                    setChannel("letter");
+                    setCallArmed(false);
+                  }
                   setSheet(null);
                 }}
               />
@@ -1331,7 +1550,7 @@ export default function App() {
                     <p className="kicker">{PARTNER}的手机 · 第一次来电</p>
                     <h2>要允许小间来电吗？</h2>
                     <p className="lead">来电默认关着。允许之后，来电上的名字是「小间」，不是{name}，也不是{PARTNER}。</p>
-                    <p className="sheet-note">先不允许的话，这句改成信札，不会再打。</p>
+                    <p className="sheet-note">不允许也不会被催，这句会改成信札。</p>
                     <div className="sheet-actions">
                       <button className="ghost" type="button" onClick={declineCalls}>
                         先不允许
@@ -1365,9 +1584,16 @@ export default function App() {
                 {sheet.kind === "miss" ? (
                   <>
                     <h2>这会儿没接到</h2>
-                    <p className="lead">已改成一条信札，没有继续打。</p>
+                    <p className="lead">已放进信札，没有继续打。不催。</p>
                     <div className="sheet-actions">
-                      <button className="ghost" type="button" onClick={() => setSheet(null)}>
+                      <button
+                        className="ghost"
+                        type="button"
+                        onClick={() => {
+                          setGuideOpen(true);
+                          setSheet(null);
+                        }}
+                      >
                         看两边的一小步
                       </button>
                       <button
@@ -1376,7 +1602,7 @@ export default function App() {
                         onClick={() => {
                           setLens("zhou");
                           setBox("in");
-                          setStack(["guide"]);
+                          setStack(["delivered"]);
                           setSheet(null);
                           show("letters");
                         }}
@@ -1389,17 +1615,43 @@ export default function App() {
                 {sheet.kind === "demo-call" ? (
                   <>
                     <h2>还没有情绪卡</h2>
-                    <p className="lead">可以用阿宁这张演示卡。预览之后，再请小间打给{PARTNER}。来电显示的是小间。</p>
-                    <div className="script">
-                      <span>对方将看到</span>
-                      <p>{relayLines(GOLDEN_CARD, name).join("\n")}</p>
-                    </div>
+                    <p className="lead">没有卡的时候，不能直接打过去。不确定就用信札。先去树洞说一句。</p>
                     <div className="sheet-actions">
-                      <button className="ghost" type="button" onClick={() => setSheet(null)}>
-                        先去树洞
+                      <button
+                        className="cta"
+                        type="button"
+                        onClick={() => {
+                          setSheet(null);
+                          openSub("tree");
+                        }}
+                      >
+                        先去树洞说
                       </button>
-                      <button className="cta coral" type="button" onClick={() => openPreview("call", { ...GOLDEN_CARD })}>
-                        用这张预览
+                    </div>
+                    <button className="text-btn" type="button" onClick={() => setSheet({ kind: "demo-call-confirm" })}>
+                      用演示卡（会走来电）
+                    </button>
+                  </>
+                ) : null}
+                {sheet.kind === "demo-call-confirm" || sheet.kind === "call-confirm" ? (
+                  <>
+                    <p className="kicker">再确认一次</p>
+                    <h2>仍要用小间打给对方吗？</h2>
+                    <p className="lead">来电会响对方手机。对方可能关掉；关掉则改信札、不连环打。</p>
+                    <div className="sheet-actions">
+                      <button
+                        className="ghost"
+                        type="button"
+                        onClick={() => keepLetter(sheet.kind === "demo-call-confirm" ? { ...GOLDEN_CARD } : undefined)}
+                      >
+                        还是用信札
+                      </button>
+                      <button
+                        className="cta"
+                        type="button"
+                        onClick={() => armCall(sheet.kind === "demo-call-confirm" ? { ...GOLDEN_CARD } : undefined)}
+                      >
+                        仍要用来电
                       </button>
                     </div>
                   </>
