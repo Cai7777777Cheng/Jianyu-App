@@ -5,40 +5,65 @@ import {
   CAL_MONTH,
   CAL_YEAR,
   DAY_NOTES,
+  DEMO_TODAY,
   FACES,
   FREQS,
+  GOLDEN_CARD,
+  GOLDEN_LINE,
   HEARD,
+  LIGHT_REPLIES,
   NAMES,
-  SCRIPT,
+  PARTNER,
   SEED_LETTERS,
   STATE_LABEL,
+  callScript,
+  cardFromText,
   faceById,
   faceFor,
+  guidesFor,
   monthStats,
+  noteFromConvey,
+  relayLines,
+  relayText,
   replyFor,
   type DayNote,
+  type EmotionCard,
   type FaceId,
   type Letter,
-  type Resolve,
 } from "./data.ts";
 
-type View = "home" | "hub" | "cal" | "me" | "tree" | "letters" | "composer" | "call";
+type View =
+  | "home"
+  | "hub"
+  | "cal"
+  | "me"
+  | "tree"
+  | "letters"
+  | "draft"
+  | "preview"
+  | "incoming"
+  | "call"
+  | "guide"
+  | "together"
+  | "voice";
 type Tab = "home" | "hub" | "cal" | "me";
 type Msg = { id: number; role: "me" | "bot"; text: string; tint: string };
+type Channel = "letter" | "call";
+type Lens = "ning" | "zhou";
 type Sheet =
   | { kind: "day"; day: number }
-  | { kind: "phone" }
   | { kind: "name" }
+  | { kind: "permit" }
   | { kind: "miss" }
-  | { kind: "reply"; id: string }
+  | { kind: "demo-call" }
   | null;
 
 const TABS: Tab[] = ["home", "hub", "cal", "me"];
-const STATS = monthStats(DAY_NOTES);
 const STORE = "jianyu-web";
+const CALL_FACE = "/xiaojian/calm.png";
 
-function loadSaved(): { temper: FaceId; name: string; freq: string; paused: boolean } {
-  const fallback = { temper: "calm" as FaceId, name: "阿宁", freq: "刚好就好", paused: false };
+function loadSaved(): { temper: FaceId; name: string; freq: string; paused: boolean; calls: boolean } {
+  const fallback = { temper: "calm" as FaceId, name: "阿宁", freq: "刚好就好", paused: false, calls: false };
   try {
     const raw = JSON.parse(localStorage.getItem(STORE) || "null") as Partial<typeof fallback> | null;
     if (!raw) return fallback;
@@ -48,6 +73,7 @@ function loadSaved(): { temper: FaceId; name: string; freq: string; paused: bool
       name: raw.name || fallback.name,
       freq: raw.freq || fallback.freq,
       paused: !!raw.paused,
+      calls: !!raw.calls,
     };
   } catch {
     return fallback;
@@ -62,6 +88,10 @@ function greet(name: string) {
 
 function pad(n: number) {
   return (n < 10 ? "0" : "") + n;
+}
+
+function cloneDays() {
+  return DAY_NOTES.map((d) => ({ ...d }));
 }
 
 function IconHome() {
@@ -120,43 +150,24 @@ function IconArrow() {
   );
 }
 
-function MoodFace({ state }: { state: Resolve }) {
-  const mouth =
-    state === "done" ? "M7 14.5c1.2 1.5 2.8 2.2 5 2.2s3.8-.7 5-2.2" : state === "part" ? "M7.5 15h9" : "M7 16.5c1.3-1.5 3-2.2 5-2.2s3.7.7 5 2.2";
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      {state === "open" ? (
-        <>
-          <path d="M6.5 8.5 9.5 10M9.5 8.5 6.5 10M14.5 8.5 17.5 10M17.5 8.5 14.5 10" fill="none" stroke="#111" strokeWidth="0.5" strokeLinecap="round" />
-        </>
-      ) : (
-        <>
-          <circle cx="8.2" cy="10" r="1.15" fill="#111" />
-          <circle cx="15.8" cy="10" r="1.15" fill="#111" />
-        </>
-      )}
-      <path d={mouth} fill="none" stroke="#111" strokeWidth="0.53" strokeLinecap="round" />
-    </svg>
-  );
-}
-
 function tagClass(status: string) {
-  if (status === "待看") return "tag wait";
+  if (status === "待看" || status === "稍后再看") return "tag wait";
   if (status === "已送达" || status === "已回应") return "tag ok";
   if (status === "已降级") return "tag warm";
   return "tag";
 }
 
 export default function App() {
-  const saved = useRef(loadSaved());
+  const [saved] = useState(loadSaved);
   const [view, setView] = useState<View>("home");
   const [tab, setTab] = useState<Tab>("home");
   const [stack, setStack] = useState<View[]>([]);
-  const [temper, setTemper] = useState<FaceId>(saved.current.temper);
-  const [shown, setShown] = useState<FaceId>(saved.current.temper);
-  const [name, setName] = useState(saved.current.name);
-  const [freq, setFreq] = useState(saved.current.freq);
-  const [paused, setPaused] = useState(saved.current.paused);
+  const [temper, setTemper] = useState<FaceId>(saved.temper);
+  const [shown, setShown] = useState<FaceId>(saved.temper);
+  const [name, setName] = useState(saved.name);
+  const [freq, setFreq] = useState(saved.freq);
+  const [paused, setPaused] = useState(saved.paused);
+  const [callsEnabled, setCallsEnabled] = useState(saved.calls);
   const [ventOnly, setVentOnly] = useState(false);
   const [listening, setListening] = useState(false);
   const [draft, setDraft] = useState("");
@@ -164,14 +175,16 @@ export default function App() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [letters, setLetters] = useState<Letter[]>(SEED_LETTERS);
   const [box, setBox] = useState<"in" | "out">("in");
-  const [feel, setFeel] = useState("");
-  const [when, setWhen] = useState("");
-  const [need, setNeed] = useState("");
-  const [previewOn, setPreviewOn] = useState(false);
-  const [viaVoice, setViaVoice] = useState(false);
+  const [lens, setLens] = useState<Lens>("ning");
+  const [card, setCard] = useState<EmotionCard | null>(null);
+  const [offer, setOffer] = useState(false);
+  const [guideCard, setGuideCard] = useState<EmotionCard | null>(null);
+  const [channel, setChannel] = useState<Channel | null>(null);
+  const [days, setDays] = useState<DayNote[]>(cloneDays);
   const [callSec, setCallSec] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const [zhouNod, setZhouNod] = useState(false);
   const [sheet, setSheet] = useState<Sheet>(null);
-  const [replyDraft, setReplyDraft] = useState("");
   const [toast, setToast] = useState("");
   const [toastOn, setToastOn] = useState(false);
   const [clock, setClock] = useState("9:41");
@@ -182,18 +195,36 @@ export default function App() {
   const temperRef = useRef(temper);
   const ventRef = useRef(ventOnly);
   const listenRef = useRef(listening);
+  const viewRef = useRef(view);
+  const nameRef = useRef(name);
+  const callsRef = useRef(callsEnabled);
   const floatRef = useRef<HTMLDivElement>(null);
-  temperRef.current = temper;
-  ventRef.current = ventOnly;
-  listenRef.current = listening;
+  const logRef = useRef<HTMLDivElement>(null);
+  const bubbleRef = useRef<HTMLDivElement>(null);
+  const stats = monthStats(days);
+  const face = faceById(listening ? "listen" : shown);
+  const isTab = (TABS as string[]).includes(view);
+  const homeLines = messages.slice(-2);
+  const fresh = letters.find((item) => item.fresh);
+  const script = card ? callScript(card, name) : "";
+  const guides = guidesFor(name, PARTNER);
+
+  useEffect(() => {
+    temperRef.current = temper;
+    ventRef.current = ventOnly;
+    listenRef.current = listening;
+    viewRef.current = view;
+    nameRef.current = name;
+    callsRef.current = callsEnabled;
+  }, [temper, ventOnly, listening, view, name, callsEnabled]);
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORE, JSON.stringify({ temper, name, freq, paused }));
+      localStorage.setItem(STORE, JSON.stringify({ temper, name, freq, paused, calls: callsEnabled }));
     } catch {
       /* file:// or private mode */
     }
-  }, [temper, name, freq, paused]);
+  }, [temper, name, freq, paused, callsEnabled]);
 
   useEffect(() => {
     const tick = () => {
@@ -214,6 +245,16 @@ export default function App() {
   useEffect(() => {
     const el = floatRef.current;
     if (!el) return;
+    const onEnd = (e: AnimationEvent) => {
+      if (e.animationName === "pop") el.classList.remove("bounce");
+    };
+    el.addEventListener("animationend", onEnd);
+    return () => el.removeEventListener("animationend", onEnd);
+  }, []);
+
+  useEffect(() => {
+    const el = floatRef.current;
+    if (!el || pop === 0) return;
     el.classList.remove("bounce");
     void el.offsetWidth;
     el.classList.add("bounce");
@@ -221,9 +262,14 @@ export default function App() {
 
   useEffect(() => {
     if (!toastOn) return;
-    const id = window.setTimeout(() => setToastOn(false), 2200);
+    const id = window.setTimeout(() => setToastOn(false), 2400);
     return () => window.clearTimeout(id);
   }, [toastOn, toast]);
+
+  useEffect(() => {
+    bubbleRef.current?.scrollTo({ top: 9999 });
+    logRef.current?.scrollTo({ top: 9999 });
+  }, [messages, view]);
 
   function ping(msg: string) {
     setToast(msg);
@@ -234,6 +280,7 @@ export default function App() {
     setView(next);
     if ((TABS as string[]).includes(next)) setTab(next as Tab);
     if (next !== "call") setCallSec(0);
+    if (next !== "voice") setPlaying(false);
   }
   function goTab(next: Tab) {
     setStack([]);
@@ -241,7 +288,7 @@ export default function App() {
     show(next);
   }
   function openSub(next: View) {
-    setStack((s) => [...s, view]);
+    setStack((s) => [...s, viewRef.current]);
     show(next);
   }
   function back() {
@@ -249,6 +296,11 @@ export default function App() {
     const prev = stack[stack.length - 1] ?? tab;
     setStack((s) => s.slice(0, -1));
     show(prev);
+  }
+  function land(next: View) {
+    setStack([]);
+    setSheet(null);
+    show(next);
   }
 
   function pushLine(role: "me" | "bot", text: string, tint: string) {
@@ -259,17 +311,28 @@ export default function App() {
   function speak(text: string) {
     const value = text.trim();
     if (!value) return;
-    const face = ventRef.current ? temperRef.current : faceFor(value, temperRef.current);
-    const tint = faceById(face).tint;
+    const vent = ventRef.current;
+    const faceId = vent ? temperRef.current : faceFor(value, temperRef.current);
+    const tint = faceById(faceId).tint;
+    const nextCard = vent ? null : cardFromText(value);
+    const from = viewRef.current;
     pushLine("me", value, tint);
-    setShown(face);
+    setShown(faceId);
     setPop((n) => n + 1);
     window.setTimeout(() => {
-      pushLine("bot", replyFor(value, face, ventRef.current), "#ffffff");
+      pushLine("bot", replyFor(value, faceId, vent), "#ffffff");
+      if (nextCard) {
+        setCard(nextCard);
+        setOffer(true);
+      }
     }, 420);
     window.setTimeout(() => {
       if (!listenRef.current) setShown(temperRef.current);
-    }, 4200);
+      if (nextCard) {
+        setStack((s) => [...s, from]);
+        show("draft");
+      }
+    }, 880);
   }
 
   function startListen() {
@@ -298,58 +361,134 @@ export default function App() {
     speak(value);
   }
 
-  function buildSentence() {
-    if (!feel.trim() || !need.trim()) return "";
-    return `${feel.trim()}${when.trim() ? `（${when.trim()}）` : ""}。我希望${need.trim()}。不是指责，只是这个需要。`;
+  function deliver(source: EmotionCard, status: string, meta: string, reply: string, dest: "guide" | "letters") {
+    const id = "n" + noteSeq.current++;
+    const letter: Letter = {
+      id,
+      box: "out",
+      who: "小间 · 代我转达",
+      body: relayText(source, nameRef.current),
+      status: reply ? "已回应" : status,
+      meta,
+      reply,
+      conflict: source.conflict,
+      fresh: true,
+    };
+    setLetters((list) => [letter, ...list.map((item) => ({ ...item, fresh: false }))]);
+    setGuideCard(source);
+    setOffer(false);
+    setDays((list) => list.map((d) => (d.day === DEMO_TODAY ? noteFromConvey(source, reply) : d)));
+    setLens("zhou");
+    setBox("in");
+    if (source.conflict && dest === "guide") land("guide");
+    else land("letters");
   }
 
-  function sendNote() {
-    const sentence = buildSentence();
-    if (!sentence || !previewOn) {
-      ping("先预览，再确认转达。");
+  function openPreview(pref: Channel | null, source?: EmotionCard) {
+    if (source) setCard(source);
+    setChannel(pref);
+    setSheet(null);
+    openSub("preview");
+  }
+
+  function sendChosen() {
+    if (!card || !channel) {
+      ping("先选信札，或小间来电。");
       return;
     }
-    const id = "n" + noteSeq.current++;
-    setLetters((list) => [
-      {
-        id,
-        box: "out",
-        who: viaVoice ? "语音代转" : "我刚确认的短笺",
-        body: sentence,
-        status: "已送达",
-        meta: `${viaVoice ? "语音" : "短笺"} · 经你确认 · 不含原话`,
-        reply: "",
-      },
-      ...list,
-    ]);
-    setPreviewOn(false);
-    setViaVoice(false);
-    setFeel("");
-    setWhen("");
-    setNeed("");
-    setBox("out");
-    ping("已送达。对方看到的是这句，不是原话。");
-    show("letters");
+    if (channel === "letter") {
+      deliver(card, "待看", "短笺 · 小周还没回", "", "guide");
+      ping("已放进小周的信札。对方看到的是这三句，不是原话。");
+      return;
+    }
+    setStack((s) => [...s, "preview"]);
+    show("incoming");
+    if (!callsRef.current) setSheet({ kind: "permit" });
   }
 
-  const face = faceById(listening ? "listen" : shown);
-  const rest = faceById(temper);
-  const isTab = (TABS as string[]).includes(view);
-  const homeLines = messages.slice(-2);
-  const dayNote = (day: number) => DAY_NOTES.find((d) => d.day === day);
-  const sentence = buildSentence();
+  function allowCalls() {
+    setCallsEnabled(true);
+    setSheet(null);
+    ping("小周允许了。来电上的名字是小间。");
+  }
 
-  const cells: Array<number | null> = [
-    ...Array.from({ length: CAL_LEAD }, () => null),
-    ...Array.from({ length: CAL_DAYS }, (_, i) => i + 1),
-  ];
+  function declineCalls() {
+    if (!card) return;
+    setSheet(null);
+    deliver(card, "已降级", "没有打开来电，改成了信札", "", "guide");
+    ping("没打开来电。这句改成信札了，不会再打。");
+  }
+
+  function answerCall() {
+    setSheet(null);
+    setCallSec(0);
+    show("call");
+  }
+
+  function laterCall() {
+    if (!card) return;
+    deliver(card, "待看", "来电选了稍后，没有再打", "", "guide");
+    ping("已稍后。不会再打，短笺留在信札里。");
+  }
+
+  function missedCall() {
+    if (!card) return;
+    deliver(card, "已降级", "没接到，已改成信札，没有再打", "", "guide");
+    setSheet({ kind: "miss" });
+  }
+
+  function replyTo(id: string, reply: string) {
+    setLetters((list) => list.map((item) => (item.id === id ? { ...item, status: "已回应", reply, fresh: true } : { ...item, fresh: false })));
+    const item = letters.find((n) => n.id === id);
+    if (item?.box === "out" && guideCard && item.conflict) {
+      setDays((list) => list.map((d) => (d.day === DEMO_TODAY ? noteFromConvey(guideCard, reply) : d)));
+    }
+    ping(`${lens === "zhou" ? "小周" : name}回了「${reply}」。`);
+  }
+
+  function resetDemo() {
+    noteSeq.current = 3;
+    msgId.current = 1;
+    setLetters(SEED_LETTERS.map((n) => ({ ...n })));
+    setDays(cloneDays());
+    setMessages([]);
+    setCard(null);
+    setOffer(false);
+    setGuideCard(null);
+    setCallsEnabled(false);
+    setVentOnly(false);
+    setListening(false);
+    setLens("ning");
+    setBox("in");
+    setChannel(null);
+    setZhouNod(false);
+    setDraft("");
+    setTreeDraft("");
+    ping("演示回到开头。来电仍然关着。");
+    goTab("home");
+  }
+
+  function visibleLetters() {
+    const want = lens === "ning" ? box : box === "in" ? "out" : "in";
+    return letters.filter((n) => n.box === want);
+  }
+
+  function canReply(n: Letter) {
+    if (n.reply || n.status === "稍后再看") return false;
+    if (lens === "zhou" && n.box === "out") return true;
+    if (lens === "ning" && n.box === "in") return true;
+    return false;
+  }
+
+  const cells: Array<number | null> = [...Array.from({ length: CAL_LEAD }, () => null), ...Array.from({ length: CAL_DAYS }, (_, i) => i + 1)];
+  const dayNote = (day: number) => days.find((d) => d.day === day);
 
   return (
     <div className="stage">
       <p className="stage-hint">
-        间语 · Vite 原型
+        间语 · 阿宁 / 小周
         <br />
-        首页直接跟小间说。底栏四栏。
+        树洞收成情绪卡，再选信札或小间来电。
       </p>
       <div className="phone" data-temper={listening ? "listen" : shown}>
         <header className="status">
@@ -375,7 +514,7 @@ export default function App() {
         </header>
 
         <div className="app">
-          <section className={view === "home" ? "screen on" : "screen"} id="view-home">
+          <section className={view === "home" ? "screen on" : "screen"}>
             <div className="home">
               <div className="home-top">
                 <div>
@@ -387,75 +526,113 @@ export default function App() {
                   <span className="mood">{face.name}</span>
                 </div>
                 <button className="backlog" type="button" onClick={() => goTab("cal")}>
-                  还积着 {STATS.open}
+                  还积着 {stats.open}
                 </button>
               </div>
               <div className="hero-zone">
-                <div className={listening ? "float listening" : "float"} id="hero-float" ref={floatRef}>
+                <div className="halo" aria-hidden="true" />
+                <div className={listening ? "float listening" : "float"} ref={floatRef}>
                   <div className="sway">
-                    <img id="hero-img" alt={`小间 · ${face.name}`} src={face.src} draggable={false} />
+                    <img alt={`小间 · ${face.name}`} src={face.src} draggable={false} />
                   </div>
                 </div>
               </div>
-              <div className="bubbles" aria-live="polite">
+              <div className="bubbles" aria-live="polite" ref={bubbleRef}>
                 {homeLines.map((m) => (
                   <div key={m.id} className={m.role === "me" ? "bubble me" : "bubble bot"} style={m.role === "me" ? { background: m.tint } : undefined}>
                     {m.text}
                   </div>
                 ))}
               </div>
-              <form className={listening ? "help listening" : "help"} id="dock" onSubmit={onHelp}>
-                <input
-                  id="say"
-                  value={draft}
-                  placeholder={listening ? "在听…" : "跟小间说说"}
-                  autoComplete="off"
-                  enterKeyHint="send"
-                  onChange={(e) => setDraft(e.target.value)}
-                />
-                <button className={listening ? "help-go hot" : "help-go"} type="submit" aria-label={draft.trim() ? "发送" : "说话"}>
-                  {draft.trim() && !listening ? <IconArrow /> : <IconMic />}
-                </button>
-              </form>
+              <div className="dock-stack">
+                {messages.length === 0 ? (
+                  <button className="suggest" type="button" onClick={() => speak(GOLDEN_LINE)}>
+                    {GOLDEN_LINE}
+                  </button>
+                ) : null}
+                {offer && card ? (
+                  <button className="card-chip" type="button" onClick={() => openSub("draft")}>
+                    <span>
+                      <b>情绪卡好了</b>
+                      <small>还没决定要不要让{PARTNER}知道</small>
+                    </span>
+                  </button>
+                ) : null}
+                {fresh ? (
+                  <button
+                    className="live-pill"
+                    type="button"
+                    onClick={() => {
+                      setLens("zhou");
+                      setBox("in");
+                      openSub("letters");
+                    }}
+                  >
+                    <span>
+                      <b>{fresh.reply ? `${PARTNER}回了「${fresh.reply}」` : fresh.status === "已降级" ? "没接到，已改成信札" : `已转达，等${PARTNER}回`}</b>
+                      <small>{fresh.reply ? "点开可以看这封信札" : "点开信札，可以回一句"}</small>
+                    </span>
+                  </button>
+                ) : null}
+                <form className={listening ? "help listening" : "help"} onSubmit={onHelp}>
+                  <input
+                    value={draft}
+                    placeholder={listening ? "在听…" : "跟小间说说"}
+                    autoComplete="off"
+                    enterKeyHint="send"
+                    onChange={(e) => setDraft(e.target.value)}
+                  />
+                  <button className={listening ? "help-go hot" : "help-go"} type="submit" aria-label={draft.trim() ? "发送" : "说话"}>
+                    {draft.trim() && !listening ? <IconArrow /> : <IconMic />}
+                  </button>
+                </form>
+              </div>
             </div>
           </section>
 
           <section className={view === "hub" ? "screen on" : "screen"}>
             <div className="scroll">
               <h1 className="page-title">交流</h1>
-              <p className="page-sub">同一件事，选一块说出去。</p>
+              <p className="page-sub">同一件事，选一条路说出去。</p>
               <div className="bento">
                 <button className="tile tile-tree" type="button" onClick={() => openSub("tree")}>
                   <img className="tile-art" src="/channels/tree.png" alt="" draggable={false} />
                   <span className="tile-copy">
-                    <span className="kicker">私密</span>
+                    <span className="kicker">只倒给小间</span>
                     <span className="tile-title">树洞</span>
-                    <span className="tile-desc">说给小间听，默认不转给对方。</span>
+                    <span className="tile-desc">原话留在这里。对方默认看不到。</span>
                   </span>
                 </button>
                 <button className="tile tile-note" type="button" onClick={() => openSub("letters")}>
                   <img className="tile-art" src="/channels/letters.png" alt="" draggable={false} />
                   <span className="tile-copy">
-                    <span className="kicker">信件</span>
+                    <span className="kicker">日常说清</span>
                     <span className="tile-title">信札</span>
-                    <span className="tile-desc">短笺和回应</span>
+                    <span className="tile-desc">短笺。可以回「我收到了」。</span>
                   </span>
                 </button>
-                <button className="tile tile-voice" type="button" onClick={() => openSub("composer")}>
+                <button className="tile tile-voice" type="button" onClick={() => openSub("voice")}>
                   <img className="tile-art" src="/channels/voice.png" alt="" draggable={false} />
                   <span className="tile-copy">
-                    <span className="kicker">整理</span>
+                    <span className="kicker">想听语气</span>
                     <span className="tile-title">语音</span>
-                    <span className="tile-desc">收成一句需求</span>
+                    <span className="tile-desc">小间把情绪卡读出来。</span>
                   </span>
                 </button>
               </div>
-              <button className="tile tile-phone" type="button" onClick={() => setSheet({ kind: "phone" })}>
+              <button
+                className="tile tile-phone"
+                type="button"
+                onClick={() => {
+                  if (card) openPreview("call");
+                  else setSheet({ kind: "demo-call" });
+                }}
+              >
                 <img className="tile-art" src="/channels/phone.png" alt="" draggable={false} />
                 <span className="tile-copy">
-                  <span className="kicker">需当次确认</span>
-                  <span className="tile-title">电话</span>
-                  <span className="tile-desc">小间用自己的名字打。没接就改短笺，不连着打。</span>
+                  <span className="kicker">想被郑重听见</span>
+                  <span className="tile-title">小间来电</span>
+                  <span className="tile-desc">来电显示小间。默认关，第一次会问。</span>
                 </span>
               </button>
             </div>
@@ -465,7 +642,7 @@ export default function App() {
             <div className="scroll">
               <h1 className="page-title">情绪日历</h1>
               <p className="page-sub">
-                {CAL_YEAR}年{CAL_MONTH}月 · 两人之间的事
+                {CAL_YEAR}年{CAL_MONTH}月 · 点开才看约定
               </p>
               <div className="legend">
                 <i className="done">已疏通</i>
@@ -483,9 +660,15 @@ export default function App() {
                   const note = dayNote(day);
                   const state = note?.state ?? "empty";
                   return (
-                    <button key={day} type="button" className={`day ${state}`} disabled={!note} onClick={() => note && setSheet({ kind: "day", day })}>
-                      {note ? <MoodFace state={note.state} /> : null}
+                    <button
+                      key={day}
+                      type="button"
+                      className={`day ${state}${note ? " has" : ""}${day === DEMO_TODAY ? " today" : ""}`}
+                      disabled={!note}
+                      onClick={() => note && setSheet({ kind: "day", day })}
+                    >
                       <span>{day}</span>
+                      <i className="dot" />
                     </button>
                   );
                 })}
@@ -494,19 +677,19 @@ export default function App() {
                 <div className="kicker">本月小结</div>
                 <h2>疏通了</h2>
                 <p>
-                  {STATS.total} 件里说开了 {STATS.done} 件。还积压 {STATS.open} 件，{STATS.part} 件只通了一半。
+                  {stats.total} 件里说开了 {stats.done} 件。还积压 {stats.open} 件，{stats.part} 件只通了一半。
                 </p>
                 <div className="stats">
                   <div>
-                    <b>{STATS.rate}%</b>
+                    <b>{stats.rate}%</b>
                     <span>疏通率</span>
                   </div>
                   <div>
-                    <b>{STATS.part}</b>
+                    <b>{stats.part}</b>
                     <span>只通一半</span>
                   </div>
                   <div>
-                    <b>{STATS.open}</b>
+                    <b>{stats.open}</b>
                     <span>还积着</span>
                   </div>
                 </div>
@@ -548,16 +731,28 @@ export default function App() {
                   </span>
                   <span className="set-val">{name}</span>
                 </button>
-                <button
-                  className="set-row"
-                  type="button"
-                  onClick={() => setFreq(FREQS[(FREQS.indexOf(freq) + 1) % FREQS.length])}
-                >
+                <button className="set-row" type="button" onClick={() => setFreq(FREQS[(FREQS.indexOf(freq) + 1) % FREQS.length])}>
                   <span>
                     <b>主动开口</b>
                     <small>还是要你自己接话</small>
                   </span>
                   <span className="set-val">{freq}</span>
+                </button>
+                <button
+                  className="set-row"
+                  type="button"
+                  onClick={() => {
+                    setCallsEnabled((v) => !v);
+                    ping(!callsEnabled ? "已允许小间来电。" : "来电关了。下次打过来会再问一次。");
+                  }}
+                >
+                  <span>
+                    <b>允许小间来电</b>
+                    <small>默认关。关掉之后，下次会再问</small>
+                  </span>
+                  <span className={callsEnabled ? "switch on" : "switch"}>
+                    <i />
+                  </span>
                 </button>
                 <button
                   className="set-row"
@@ -581,11 +776,14 @@ export default function App() {
                 <h3>微信里的小间</h3>
                 <ul>
                   <li>聊天框里可以说，话回到首页和树洞。</li>
-                  <li>短笺要在这里预览确认，电话要每次点头。</li>
-                  <li>小间只用自己的名字，不会装成你的伴侣。</li>
+                  <li>短笺要先预览。来电默认关，第一次会问。</li>
+                  <li>小间只用自己的名字，不会装成{PARTNER}。</li>
                 </ul>
                 <p className="note">这是说明。这个原型不连接微信。</p>
               </div>
+              <button className="linkish" type="button" onClick={resetDemo}>
+                把这条演示回到开头
+              </button>
             </div>
           </section>
 
@@ -596,14 +794,14 @@ export default function App() {
               </button>
               <div className="subhead-text">
                 <h1>树洞</h1>
-                <p>{ventOnly ? "今天只倒苦水" : "完整记录留在这里"}</p>
+                <p>{ventOnly ? "今天只倒苦水" : "原话留在这里"}</p>
               </div>
               <button
                 className="vent"
                 type="button"
                 onClick={() => {
                   setVentOnly((v) => !v);
-                  ping(!ventOnly ? "今天只倒苦水，不会建议转达。" : "可以听，也可以之后再整理。");
+                  ping(!ventOnly ? "今天只倒苦水，不会收成卡。" : "可以说。要不要转达，你再定。");
                 }}
               >
                 <span className={ventOnly ? "switch on" : "switch"}>
@@ -612,8 +810,15 @@ export default function App() {
                 <span>只倒苦水</span>
               </button>
             </header>
-            <div className="chat-log">
-              {messages.length === 0 ? <p className="empty">树洞还是空的。日常说话在首页。</p> : null}
+            <div className="chat-log" ref={logRef}>
+              {messages.length === 0 ? (
+                <>
+                  <p className="empty">树洞还是空的。点下面这句，或在首页说。</p>
+                  <button className="suggest" type="button" onClick={() => speak(GOLDEN_LINE)}>
+                    {GOLDEN_LINE}
+                  </button>
+                </>
+              ) : null}
               {messages.map((m) => (
                 <div key={m.id} className={m.role === "me" ? "bubble me" : "bubble bot"} style={m.role === "me" ? { background: m.tint } : undefined}>
                   {m.text}
@@ -624,6 +829,10 @@ export default function App() {
               className="help pad-help"
               onSubmit={(e) => {
                 e.preventDefault();
+                if (!treeDraft.trim()) {
+                  ping("先写一句。");
+                  return;
+                }
                 speak(treeDraft);
                 setTreeDraft("");
               }}
@@ -635,6 +844,120 @@ export default function App() {
             </form>
           </section>
 
+          <section className={view === "draft" ? "screen on" : "screen"}>
+            <header className="subhead">
+              <button className="back" type="button" aria-label="返回" onClick={back}>
+                <IconBack />
+              </button>
+              <div className="subhead-text">
+                <h1>情绪卡</h1>
+                <p>只给你看 · 还没送出</p>
+              </div>
+            </header>
+            <div className="scroll tight">
+              {card ? (
+                <>
+                  <article className="emo-card">
+                    <div className="kicker">感受 · 情境 · 一件小事</div>
+                    <h2>我听到的是</h2>
+                    <div className="emo-line">
+                      <b>感受</b>
+                      <span>我感到{card.feel}</span>
+                    </div>
+                    <div className="emo-line">
+                      <b>情境</b>
+                      <span>当{card.situation}的时候</span>
+                    </div>
+                    <div className="emo-line">
+                      <b>需要</b>
+                      <span>我希望{card.need}</span>
+                    </div>
+                  </article>
+                  <div className="raw-box">
+                    <b>树洞原话 · 不会送出</b>
+                    <p>{card.raw}</p>
+                  </div>
+                  <div className="choice-row">
+                    <button
+                      className="cta ghost"
+                      type="button"
+                      onClick={() => {
+                        setCard(null);
+                        setOffer(false);
+                        ping("留在树洞了。对方看不到。");
+                        back();
+                      }}
+                    >
+                      只留树洞
+                    </button>
+                    <button className="cta" type="button" onClick={() => openPreview(null)}>
+                      想转达
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <p className="empty">还没有情绪卡。先在树洞或首页说一句。</p>
+              )}
+            </div>
+          </section>
+
+          <section className={view === "preview" ? "screen on" : "screen"}>
+            <header className="subhead">
+              <button className="back" type="button" aria-label="返回" onClick={back}>
+                <IconBack />
+              </button>
+              <div className="subhead-text">
+                <h1>对方将看到</h1>
+                <p>确认之后才会送出</p>
+              </div>
+            </header>
+            <div className="scroll tight">
+              {card ? (
+                <>
+                  <article className="preview-card">
+                    <div className="plabel">小间代转 · 不是{name}本人</div>
+                    <h2>只有这三句</h2>
+                    <div className="relay">
+                      {relayLines(card, name).map((line, i) => (
+                        <p key={i}>{line}</p>
+                      ))}
+                    </div>
+                    <p className="warn">树洞原话不会出现。来电上的名字是小间，不是{PARTNER}。</p>
+                  </article>
+                  <label className="field">
+                    <span>感受</span>
+                    <input value={card.feel} onChange={(e) => setCard({ ...card, feel: e.target.value })} />
+                  </label>
+                  <label className="field">
+                    <span>情境</span>
+                    <input value={card.situation} onChange={(e) => setCard({ ...card, situation: e.target.value })} />
+                  </label>
+                  <label className="field">
+                    <span>正向需求</span>
+                    <input value={card.need} onChange={(e) => setCard({ ...card, need: e.target.value })} />
+                  </label>
+                  <div className="chan-row">
+                    <button type="button" className={channel === "letter" ? "chan chan-letter on" : "chan chan-letter"} onClick={() => setChannel("letter")}>
+                      <span className="kicker">短笺</span>
+                      <b>信札</b>
+                      <small>{PARTNER}可以回「我收到了」或「今晚可以」。</small>
+                    </button>
+                    <button type="button" className={channel === "call" ? "chan chan-call on" : "chan chan-call"} onClick={() => setChannel("call")}>
+                      <span className="kicker">来电</span>
+                      <b>小间来电</b>
+                      <small>{callsEnabled ? "小周已允许来电。" : "默认关。第一次会问小周。"}</small>
+                    </button>
+                  </div>
+                  <button className="cta" type="button" disabled={!channel || !card.feel.trim() || !card.need.trim()} onClick={sendChosen}>
+                    {channel === "call" ? `请小间打给${PARTNER}` : channel === "letter" ? `放进${PARTNER}的信札` : "先选一种送达"}
+                  </button>
+                </>
+              ) : (
+                <p className="empty">还没有可以转达的卡。</p>
+              )}
+            </div>
+          </section>
+
           <section className={view === "letters" ? "screen on" : "screen"}>
             <header className="subhead">
               <button className="back" type="button" aria-label="返回" onClick={back}>
@@ -642,10 +965,18 @@ export default function App() {
               </button>
               <div className="subhead-text">
                 <h1>信札</h1>
-                <p>对方看到的是短笺，不是原话</p>
+                <p>{lens === "ning" ? `${name}的信札` : `${PARTNER}的手机 · 看到的是短笺`}</p>
               </div>
             </header>
             <div className="scroll tight">
+              <div className="seg">
+                <button type="button" className={lens === "ning" ? "on" : ""} onClick={() => setLens("ning")}>
+                  {name}
+                </button>
+                <button type="button" className={lens === "zhou" ? "on" : ""} onClick={() => setLens("zhou")}>
+                  {PARTNER}
+                </button>
+              </div>
               <div className="seg">
                 <button type="button" className={box === "in" ? "on" : ""} onClick={() => setBox("in")}>
                   收到
@@ -654,187 +985,316 @@ export default function App() {
                   发出
                 </button>
               </div>
-              {letters.filter((n) => n.box === box).length === 0 ? <p className="empty">这一栏还是空的。</p> : null}
-              {letters
-                .filter((n) => n.box === box)
-                .map((n) => (
-                  <article key={n.id} className="letter">
-                    <header>
-                      <span className="who">{n.who}</span>
-                      <span className={tagClass(n.status)}>{n.status}</span>
-                    </header>
-                    <p>{n.body}</p>
-                    <div className="meta">{n.meta}</div>
-                    {n.reply ? <div className="meta">你的回应：{n.reply}</div> : null}
-                    {n.box === "in" && n.status === "待看" ? (
-                      <div className="letter-actions">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setLetters((list) => list.map((item) => (item.id === n.id ? { ...item, status: "稍后再看" } : item)));
-                            ping("已放下。不会计时。");
-                          }}
-                        >
-                          稍后
+              {visibleLetters().length === 0 ? <p className="empty">这一栏还是空的。</p> : null}
+              {visibleLetters().map((n) => (
+                <article key={n.id} className={n.box === "out" ? "letter out" : "letter in"}>
+                  <header>
+                    <span className="who">{n.who}</span>
+                    <span className={tagClass(n.status)}>{n.status}</span>
+                  </header>
+                  <p>{n.body}</p>
+                  <div className="meta">{n.meta}</div>
+                  {n.reply ? <div className="meta">回了一句：{n.reply}</div> : null}
+                  {canReply(n) ? (
+                    <div className="letter-actions">
+                      {LIGHT_REPLIES.map((reply) => (
+                        <button key={reply} type="button" onClick={() => replyTo(n.id, reply)}>
+                          {reply}
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setReplyDraft("");
-                            setSheet({ kind: "reply", id: n.id });
-                          }}
-                        >
-                          回一句
-                        </button>
-                      </div>
-                    ) : null}
-                  </article>
-                ))}
+                      ))}
+                      <button
+                        className="ghosty"
+                        type="button"
+                        onClick={() => {
+                          setLetters((list) => list.map((item) => (item.id === n.id ? { ...item, status: "稍后再看" } : item)));
+                          ping("已放下。不会计时，也不会再催。");
+                        }}
+                      >
+                        稍后
+                      </button>
+                    </div>
+                  ) : null}
+                </article>
+              ))}
+              <button
+                className="cta ghost"
+                type="button"
+                onClick={() => openPreview("letter", card ?? { ...GOLDEN_CARD })}
+              >
+                {card ? "用这张情绪卡写短笺" : "用演示卡写一封"}
+              </button>
             </div>
           </section>
 
-          <section className={view === "composer" ? "screen on" : "screen"}>
+          <section className={view === "voice" ? "screen on" : "screen"}>
             <header className="subhead">
               <button className="back" type="button" aria-label="返回" onClick={back}>
                 <IconBack />
               </button>
               <div className="subhead-text">
-                <h1>短笺</h1>
-                <p>确认之后才发出</p>
+                <h1>语音</h1>
+                <p>小间朗读，不送原话</p>
               </div>
             </header>
             <div className="scroll tight">
-              <label className="field">
-                <span>感受</span>
-                <input
-                  value={feel}
-                  placeholder="我有点闷"
-                  onChange={(e) => {
-                    setFeel(e.target.value);
-                    setPreviewOn(false);
-                    setViaVoice(false);
-                  }}
-                />
-              </label>
-              <label className="field">
-                <span>当时</span>
-                <input
-                  value={when}
-                  placeholder="你回得慢的时候"
-                  onChange={(e) => {
-                    setWhen(e.target.value);
-                    setPreviewOn(false);
-                    setViaVoice(false);
-                  }}
-                />
-              </label>
-              <label className="field">
-                <span>希望对方</span>
-                <input
-                  value={need}
-                  placeholder="先回我一句「晚点聊」"
-                  onChange={(e) => {
-                    setNeed(e.target.value);
-                    setPreviewOn(false);
-                    setViaVoice(false);
-                  }}
-                />
-              </label>
-              <button
-                className="voice-btn"
-                type="button"
-                onClick={() => {
-                  setFeel("我有点闷");
-                  setWhen("你回得慢的时候");
-                  setNeed("先回我一句「晚点聊」");
-                  setViaVoice(true);
-                  setPreviewOn(false);
-                  ping("已整理成一句，还没发出。");
-                }}
-              >
-                说一句（示意）
-              </button>
-              <div className={previewOn ? "preview on" : "preview"}>
-                <div className="plabel">对方将看到</div>
-                <p>{sentence}</p>
-                <p className="warn">这是整理后的需求，不是原话。点下面才会发出。</p>
+              <div className={playing ? "voice-stage playing" : "voice-stage"}>
+                <img className="voice-face" alt="" src={CALL_FACE} />
+                <div className="bars" aria-hidden="true">
+                  <i /><i /><i /><i /><i />
+                </div>
               </div>
-              <button
-                className="cta"
-                type="button"
-                onClick={() => {
-                  if (!sentence) {
-                    ping("先写下感受，和你希望的那一件小事。");
-                    return;
-                  }
-                  setPreviewOn(true);
-                }}
-              >
-                预览这句
-              </button>
-              <button className="cta" type="button" disabled={!previewOn} onClick={sendNote}>
-                确认转达
-              </button>
+              {card ? (
+                <>
+                  <div className="script">
+                    <span>{playing ? "小间正在读" : "将要读的"}</span>
+                    <p>{script}</p>
+                  </div>
+                  <button className="cta" type="button" onClick={() => setPlaying((v) => !v)}>
+                    {playing ? "停一下" : "让小间读一遍"}
+                  </button>
+                  <button className="cta ghost" type="button" onClick={() => openPreview(null)}>
+                    改用信札或来电送出
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p className="empty">还没有情绪卡。可以先用阿宁这张演示，或回树洞说一句。</p>
+                  <button className="cta" type="button" onClick={() => setCard({ ...GOLDEN_CARD })}>
+                    用演示的一张
+                  </button>
+                  <button className="cta ghost" type="button" onClick={() => openSub("tree")}>
+                    去树洞说
+                  </button>
+                </>
+              )}
+            </div>
+          </section>
+
+          <section className={view === "incoming" ? "screen on" : "screen"}>
+            <div className={sheet?.kind === "permit" ? "incoming holding" : "incoming"}>
+              <div className="who-flag">{PARTNER}的手机</div>
+              <div className="pulse-wrap">
+                <span className="pulse-ring" />
+                <span className="pulse-ring d2" />
+                <img className="incoming-face" alt="小间" src={CALL_FACE} draggable={false} />
+              </div>
+              <h1>小间</h1>
+              <p className="sub">
+                有一句想替{name}转达
+                <br />
+                不是{name}本人
+              </p>
+              <div className="incoming-actions">
+                <button className="cta" type="button" onClick={answerCall} disabled={sheet?.kind === "permit"}>
+                  接通
+                </button>
+                <button className="cta ghost" type="button" onClick={laterCall} disabled={sheet?.kind === "permit"}>
+                  稍后
+                </button>
+                <button
+                  className="cta ghost"
+                  type="button"
+                  disabled={sheet?.kind === "permit"}
+                  onClick={() => {
+                    if (!card) return;
+                    deliver(card, "待看", "来电改看了信札", "", "guide");
+                    ping("改看信札了。没有继续打。");
+                  }}
+                >
+                  改看信札
+                </button>
+                <button className="text-btn" type="button" disabled={sheet?.kind === "permit"} onClick={missedCall}>
+                  这会儿没接
+                </button>
+              </div>
             </div>
           </section>
 
           <section className={view === "call" ? "screen on" : "screen"}>
             <header className="subhead">
-              <button className="back" type="button" aria-label="返回" onClick={back}>
+              <button
+                className="back"
+                type="button"
+                aria-label="挂断"
+                onClick={() => {
+                  if (!card) {
+                    back();
+                    return;
+                  }
+                  deliver(card, "待看", "来电接通了，还没回一句", "", "guide");
+                  ping("已挂断。没有录音。");
+                }}
+              >
                 <IconBack />
               </button>
               <div className="subhead-text">
-                <h1>小间来电</h1>
-                <p>我是小间，不是对方本人</p>
+                <h1>小间</h1>
+                <p>受{name}委托代转</p>
               </div>
             </header>
             <div className="call-body">
               <div className="call-flag">
                 <span className="live" />
-                <span>通话中 · 小间在说</span>
+                <span>通话中 · 不是{name}本人</span>
               </div>
-              <img className="call-face" alt="" src={rest.src} />
+              <img className="call-face" alt="" src={CALL_FACE} />
               <div className="script">
                 <span>小间正在说</span>
-                <p>{SCRIPT}</p>
+                <p>{script}</p>
               </div>
               <div className="call-time">
                 {pad(Math.floor(callSec / 60))}:{pad(callSec % 60)}
               </div>
               <div className="call-actions">
+                {LIGHT_REPLIES.map((reply) => (
+                  <button
+                    key={reply}
+                    className="cta"
+                    type="button"
+                    onClick={() => {
+                      if (!card) return;
+                      deliver(card, "已回应", "来电里回的", reply, "guide");
+                    }}
+                  >
+                    {reply}
+                  </button>
+                ))}
                 <button
+                  className="cta ghost"
                   type="button"
                   onClick={() => {
-                    ping("已挂断。没有录音。");
-                    back();
+                    if (!card) return;
+                    deliver(card, "待看", "来电改成了短笺", "", "guide");
+                    ping("改成短笺了。");
                   }}
                 >
-                  <span className="round dark">挂</span>
-                  <span>挂断</span>
+                  改成信札
                 </button>
                 <button
+                  className="cta ghost"
                   type="button"
                   onClick={() => {
-                    const id = "n" + noteSeq.current++;
-                    setLetters((list) => [
-                      {
-                        id,
-                        box: "out",
-                        who: "电话未接 · 改短笺",
-                        body: "我有点闷。希望你忙的时候先回我一句「晚点聊」。不是指责。",
-                        status: "已降级",
-                        meta: "未接，没有再打",
-                        reply: "",
-                      },
-                      ...list,
-                    ]);
-                    setSheet({ kind: "miss" });
+                    if (!card) return;
+                    deliver(card, "待看", "来电接通了，还没回一句", "", "guide");
+                    ping("已挂断。没有录音。");
                   }}
                 >
-                  <span className="round line">未</span>
-                  <span>对方未接</span>
+                  挂断
                 </button>
               </div>
+            </div>
+          </section>
+
+          <section className={view === "guide" ? "screen on" : "screen"}>
+            <header className="subhead">
+              <button className="back" type="button" aria-label="返回首页" onClick={() => goTab("home")}>
+                <IconBack />
+              </button>
+              <div className="subhead-text">
+                <h1>两边各一小步</h1>
+                <p>不站队，也不训一个人</p>
+              </div>
+            </header>
+            <div className="scroll tight">
+              <p className="guide-note">演示里两张并排。真用的时候，每人只看到自己的那张，也看不到对方的树洞原话。</p>
+              {guides.map((g) => (
+                <article key={g.who} className={`guide-card ${g.tone}`}>
+                  <div className="who">给{g.who}</div>
+                  <h3>{g.title}</h3>
+                  <div className="step-label">我可以做的一小步</div>
+                  <p className="step">{g.step}</p>
+                  <div className="step-label">送出去之前</div>
+                  <p className="step">{g.check}</p>
+                </article>
+              ))}
+              <button
+                className="cta"
+                type="button"
+                onClick={() => {
+                  setZhouNod(false);
+                  openSub("together");
+                }}
+              >
+                邀请一起聊 10 分钟
+              </button>
+              <button
+                className="cta ghost"
+                type="button"
+                onClick={() => {
+                  setLens("zhou");
+                  setBox("in");
+                  openSub("letters");
+                }}
+              >
+                看{PARTNER}的信札
+              </button>
+              <button
+                className="cta ghost"
+                type="button"
+                onClick={() => {
+                  setStack([]);
+                  show("cal");
+                  setSheet({ kind: "day", day: DEMO_TODAY });
+                }}
+              >
+                看{CAL_MONTH}月{DEMO_TODAY}日
+              </button>
+            </div>
+          </section>
+
+          <section className={view === "together" ? "screen on" : "screen"}>
+            <header className="subhead">
+              <button className="back" type="button" aria-label="返回" onClick={back}>
+                <IconBack />
+              </button>
+              <div className="subhead-text">
+                <h1>一起聊</h1>
+                <p>两边都点头才开始</p>
+              </div>
+            </header>
+            <div className="scroll tight">
+              <div className="nod-row">
+                <div className="nod on">
+                  {name}已准备
+                  <small>用「我感到…我需要…」</small>
+                </div>
+                <button type="button" className={zhouNod ? "nod on" : "nod"} onClick={() => setZhouNod(true)}>
+                  {zhouNod ? `${PARTNER}也愿意` : `请${PARTNER}点头`}
+                  <small>{zhouNod ? "两边都到了" : "还差这一边"}</small>
+                </button>
+              </div>
+              {zhouNod && card ? (
+                <>
+                  <article className="line-card">
+                    <b>小间请{name}先说</b>
+                    <p>我感到{card.feel}。我需要{card.need}。</p>
+                  </article>
+                  <article className="line-card">
+                    <b>小间请{PARTNER}说</b>
+                    <p>我感到这几天有点赶。我需要先回一句，今晚再留 10 分钟。</p>
+                  </article>
+                  <p className="guide-note">小间会拦住指责，改写成需要。今天可以只降温，不把所有问题谈完。</p>
+                  <button
+                    className="cta"
+                    type="button"
+                    onClick={() => {
+                      if (!guideCard && !card) return;
+                      const source = guideCard ?? card;
+                      setDays((list) => list.map((d) => (d.day === DEMO_TODAY ? noteFromConvey(source, "一起") : d)));
+                      ping(`小约定写在 ${CAL_MONTH}月${DEMO_TODAY}日。月历上只看得到状态。`);
+                      setStack([]);
+                      show("cal");
+                      setSheet({ kind: "day", day: DEMO_TODAY });
+                    }}
+                  >
+                    记成小约定
+                  </button>
+                </>
+              ) : (
+                <p className="empty">
+                  {zhouNod ? "还没有可以记的卡。" : `${PARTNER}还没点头。点上面那一格，演示里就算两边都到了。`}
+                </p>
+              )}
             </div>
           </section>
 
@@ -856,33 +1316,28 @@ export default function App() {
 
           {sheet ? (
             <div className="sheet">
-              <div className="sheet-dim" onClick={() => setSheet(null)} />
+              <div
+                className="sheet-dim"
+                onClick={() => {
+                  if (sheet.kind === "permit") return;
+                  setSheet(null);
+                }}
+              />
               <div className="sheet-panel" role="dialog" aria-modal="true">
                 <div className="grab" />
-                {sheet.kind === "day" ? <DaySheet note={dayNote(sheet.day) as DayNote} onClose={() => setSheet(null)} /> : null}
-                {sheet.kind === "phone" ? (
+                {sheet.kind === "day" && dayNote(sheet.day) ? <DaySheet note={dayNote(sheet.day) as DayNote} onClose={() => setSheet(null)} /> : null}
+                {sheet.kind === "permit" ? (
                   <>
-                    <h2>这次请小间打过去？</h2>
-                    <p className="lead">小间会报自己的名字，说明是代转。不会装成你，也不会装成对方。没接就改短笺，不会再打。</p>
-                    <div className="script-box">
-                      <b>将要说的</b>
-                      {SCRIPT}
-                    </div>
-                    <p className="sheet-note">如果是紧急危险，先联系当地求助，而不是打这通电话。</p>
+                    <p className="kicker">{PARTNER}的手机 · 第一次来电</p>
+                    <h2>要允许小间来电吗？</h2>
+                    <p className="lead">来电默认关着。允许之后，来电上的名字是「小间」，不是{name}，也不是{PARTNER}。</p>
+                    <p className="sheet-note">先不允许的话，这句改成信札，不会再打。</p>
                     <div className="sheet-actions">
-                      <button className="ghost" type="button" onClick={() => setSheet(null)}>
-                        先不打
+                      <button className="ghost" type="button" onClick={declineCalls}>
+                        先不允许
                       </button>
-                      <button
-                        className="cta coral"
-                        type="button"
-                        onClick={() => {
-                          setSheet(null);
-                          setCallSec(0);
-                          openSub("call");
-                        }}
-                      >
-                        确认拨打
+                      <button className="cta" type="button" onClick={allowCalls}>
+                        允许来电
                       </button>
                     </div>
                   </>
@@ -909,19 +1364,20 @@ export default function App() {
                 ) : null}
                 {sheet.kind === "miss" ? (
                   <>
-                    <h2>对方这会儿没接</h2>
-                    <p className="lead">已改成一条短笺，没有继续打。</p>
+                    <h2>这会儿没接到</h2>
+                    <p className="lead">已改成一条信札，没有继续打。</p>
                     <div className="sheet-actions">
-                      <button className="ghost" type="button" onClick={() => { setSheet(null); back(); }}>
-                        知道了
+                      <button className="ghost" type="button" onClick={() => setSheet(null)}>
+                        看两边的一小步
                       </button>
                       <button
                         className="cta"
                         type="button"
                         onClick={() => {
+                          setLens("zhou");
+                          setBox("in");
+                          setStack(["guide"]);
                           setSheet(null);
-                          setBox("out");
-                          setStack((s) => s.filter((v) => v !== "call"));
                           show("letters");
                         }}
                       >
@@ -930,32 +1386,20 @@ export default function App() {
                     </div>
                   </>
                 ) : null}
-                {sheet.kind === "reply" ? (
+                {sheet.kind === "demo-call" ? (
                   <>
-                    <h2>回一句</h2>
-                    <label className="field" style={{ marginTop: 12 }}>
-                      <span>你的一句</span>
-                      <input value={replyDraft} placeholder="好，我记下了" onChange={(e) => setReplyDraft(e.target.value)} />
-                    </label>
+                    <h2>还没有情绪卡</h2>
+                    <p className="lead">可以用阿宁这张演示卡。预览之后，再请小间打给{PARTNER}。来电显示的是小间。</p>
+                    <div className="script">
+                      <span>对方将看到</span>
+                      <p>{relayLines(GOLDEN_CARD, name).join("\n")}</p>
+                    </div>
                     <div className="sheet-actions">
                       <button className="ghost" type="button" onClick={() => setSheet(null)}>
-                        取消
+                        先去树洞
                       </button>
-                      <button
-                        className="cta"
-                        type="button"
-                        onClick={() => {
-                          const reply = replyDraft.trim();
-                          if (!reply) {
-                            ping("先写一句。");
-                            return;
-                          }
-                          const id = sheet.id;
-                          setLetters((list) => list.map((item) => (item.id === id ? { ...item, status: "已回应", reply } : item)));
-                          setSheet(null);
-                        }}
-                      >
-                        送出
+                      <button className="cta coral" type="button" onClick={() => openPreview("call", { ...GOLDEN_CARD })}>
+                        用这张预览
                       </button>
                     </div>
                   </>
@@ -976,11 +1420,19 @@ export default function App() {
 function DaySheet({ note, onClose }: { note: DayNote; onClose: () => void }) {
   return (
     <>
-      <h2>
-        {CAL_MONTH}月{note.day}日 · {STATE_LABEL[note.state]}
-      </h2>
-      <p className="lead">{note.issue}</p>
-      <div className="script-box">{note.detail}</div>
+      <p className="kicker">
+        {CAL_MONTH}月{note.day}日{note.day === DEMO_TODAY ? " · 今天" : ""}
+      </p>
+      <h2>{STATE_LABEL[note.state]}</h2>
+      <span className={`state-pill ${note.state}`}>{STATE_LABEL[note.state]}</span>
+      <div className="detail-block">
+        <b>约定</b>
+        <p>{note.agreement}</p>
+      </div>
+      <div className="detail-block">
+        <b>沟通结果</b>
+        <p>{note.result}</p>
+      </div>
       <div className="sheet-actions">
         <button className="cta" type="button" onClick={onClose}>
           知道了
