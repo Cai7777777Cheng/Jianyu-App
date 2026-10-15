@@ -24,6 +24,8 @@ export const PARTNER = "小周";
 export const SOFT_REPLIES = ["我收到了", "这几天再聊"] as const;
 export const FIRM_REPLY = "今晚可以";
 export const GOLDEN_LINE = "连续两天很少回我，我有点不安";
+/** 冷启动建议。低风险招呼，不把冲突金句放成第一下。 */
+export const SOFT_CHECKIN = "想跟你说一声";
 
 export function isLightReply(reply: string) {
   return reply === "我收到了" || reply === "这几天再聊" || reply === FIRM_REPLY;
@@ -265,11 +267,11 @@ export const SEED_NEED_TODAY = 78;
 
 export type NeedSource = "tree" | "home" | "voice";
 
+/** 默认只展示这三句，不展示分数。 */
 export const NEED_TIERS = [
-  { id: "calm", label: "平静", face: "calm" as FaceId, line: "还早，先树洞就好", min: 0 },
-  { id: "notice", label: "留意", face: "soft" as FaceId, line: "有一点想被听见", min: 40 },
-  { id: "near", label: "临近", face: "listen" as FaceId, line: "快到可以问你了", min: 60 },
-  { id: "ready", label: "可触发", face: "empathy" as FaceId, line: "已经攒到可以问你了", min: NEED_THRESHOLD },
+  { id: "early", label: "还早", face: "calm" as FaceId, line: "还早", min: 0 },
+  { id: "notice", label: "有一点想被听见", face: "soft" as FaceId, line: "有一点想被听见", min: 40 },
+  { id: "ready", label: "可以问你一声了", face: "listen" as FaceId, line: "可以问你一声了", min: NEED_THRESHOLD },
 ] as const;
 
 export type NeedTierId = (typeof NEED_TIERS)[number]["id"];
@@ -306,12 +308,12 @@ export function bumpNeed(score: number, source: NeedSource, text = "", ventOnly 
   return Math.max(0, Math.min(100, score + delta));
 }
 
-export const PRECALL_LINE = "小间根据你这几天的话，想帮你说清楚";
+export const PRECALL_LINE = "很短的一通。不方便就改成信札，不会再打。";
 
 export const STATE_LABEL: Record<Resolve, string> = {
   done: "已疏通",
-  part: "部分",
-  open: "未解决",
+  part: "说了一半",
+  open: "还闷着",
 };
 
 export type Letter = {
