@@ -13,13 +13,22 @@ import {
   GOLDEN_LINE,
   HEARD,
   NAMES,
+  NEED_THRESHOLD,
   PARTNER,
+  PRECALL_LINE,
   SEED_LETTERS,
+  SEED_NEED_HISTORY,
+  SEED_NEED_TODAY,
   SEED_TREE,
   SOFT_REPLIES,
   STATE_LABEL,
+  VENT_CHIPS,
+  VENT_COMPANION,
+  asideFor,
+  bumpNeed,
   callScript,
   cardFromText,
+  daySoftLabel,
   faceById,
   faceFor,
   guidesFor,
@@ -29,10 +38,12 @@ import {
   relayLines,
   relayText,
   replyFor,
+  tierFor,
   type DayNote,
   type EmotionCard,
   type FaceId,
   type Letter,
+  type NeedSource,
 } from "./data.ts";
 
 type View =
@@ -51,7 +62,7 @@ type View =
   | "together"
   | "voice";
 type Tab = "home" | "hub" | "cal" | "me";
-type Msg = { id: number; day: number; role: "me" | "bot"; text: string; tint: string };
+type Msg = { id: number; day: number; role: "me" | "bot"; text: string; tint: string; at?: string };
 type Channel = "letter" | "call";
 type Lens = "ning" | "zhou";
 type Sheet =
@@ -62,7 +73,21 @@ type Sheet =
   | { kind: "demo-call" }
   | { kind: "demo-call-confirm" }
   | { kind: "call-confirm"; enter: boolean }
+  | { kind: "need-ask" }
+  | { kind: "need-gap" }
   | null;
+
+const ASK_KEY = "jianyu-need-asked";
+
+function readAsked(): number | null {
+  try {
+    const raw = localStorage.getItem(ASK_KEY);
+    const n = Number(raw);
+    return raw && Number.isFinite(n) ? n : null;
+  } catch {
+    return null;
+  }
+}
 
 const TABS: Tab[] = ["home", "hub", "cal", "me"];
 const STORE = "jianyu-web";
@@ -200,6 +225,10 @@ export default function App() {
   const [guideOpen, setGuideOpen] = useState(false);
   const [togetherOpen, setTogetherOpen] = useState(false);
   const [sheet, setSheet] = useState<Sheet>(null);
+  const [needScore, setNeedScore] = useState(SEED_NEED_TODAY);
+  const [needHistory, setNeedHistory] = useState(() => SEED_NEED_HISTORY.map((item) => ({ ...item })));
+  const [needChartOpen, setNeedChartOpen] = useState(false);
+  const [askedDay, setAskedDay] = useState<number | null>(readAsked);
   const [toast, setToast] = useState("");
   const [toastOn, setToastOn] = useState(false);
   const [clock, setClock] = useState("9:41");
@@ -213,6 +242,9 @@ export default function App() {
   const viewRef = useRef(view);
   const nameRef = useRef(name);
   const callsRef = useRef(callsEnabled);
+  const scoreRef = useRef(needScore);
+  const askedRef = useRef(askedDay);
+  const voiceSeen = useRef(false);
   const floatRef = useRef<HTMLDivElement>(null);
   const logRef = useRef<HTMLDivElement>(null);
   const bubbleRef = useRef<HTMLDivElement>(null);
@@ -223,6 +255,9 @@ export default function App() {
   const fresh = letters.find((item) => item.fresh);
   const script = card ? callScript(card, name) : "";
   const guides = guidesFor(name, PARTNER);
+  const tier = tierFor(needScore);
+  const needReady = needScore >= NEED_THRESHOLD;
+  const needGap = Math.max(0, NEED_THRESHOLD - needScore);
 
   useEffect(() => {
     temperRef.current = temper;
@@ -282,6 +317,34 @@ export default function App() {
   }, [toastOn, toast]);
 
   useEffect(() => {
+    askedRef.current = askedDay;
+  }, [askedDay]);
+
+  useEffect(() => {
+    if (view !== "hub") return;
+    if (scoreRef.current < NEED_THRESHOLD) return;
+    if (askedRef.current === DEMO_TODAY) return;
+    const id = window.setTimeout(() => {
+      if (viewRef.current !== "hub") return;
+      if (scoreRef.current < NEED_THRESHOLD) return;
+      if (askedRef.current === DEMO_TODAY) return;
+      markAsked();
+      setSheet({ kind: "need-ask" });
+    }, 700);
+    return () => window.clearTimeout(id);
+  }, [view, needScore, askedDay]);
+
+  useEffect(() => {
+    if (view !== "voice") {
+      voiceSeen.current = false;
+      return;
+    }
+    if (voiceSeen.current) return;
+    voiceSeen.current = true;
+    raiseNeed("voice");
+  }, [view]);
+
+  useEffect(() => {
     bubbleRef.current?.scrollTo({ top: 9999 });
     logRef.current?.scrollTo({ top: 9999 });
   }, [messages, view]);
@@ -319,23 +382,50 @@ export default function App() {
     show(next);
   }
 
-  function pushLine(role: "me" | "bot", text: string, tint: string) {
-    const id = msgId.current++;
-    setMessages((list) => [...list, { id, day: DEMO_TODAY, role, text, tint }]);
+  function markAsked() {
+    if (askedRef.current === DEMO_TODAY) return;
+    askedRef.current = DEMO_TODAY;
+    setAskedDay(DEMO_TODAY);
+    try {
+      localStorage.setItem(ASK_KEY, String(DEMO_TODAY));
+    } catch {
+      /* private mode */
+    }
   }
 
-  function speak(text: string) {
+  function raiseNeed(source: NeedSource, text = "", venting = false) {
+    const prev = scoreRef.current;
+    const next = bumpNeed(prev, source, text, venting);
+    scoreRef.current = next;
+    setNeedScore(next);
+    setNeedHistory((hist) => hist.map((item) => (item.day === DEMO_TODAY ? { ...item, score: next } : item)));
+    if (prev < NEED_THRESHOLD && next >= NEED_THRESHOLD && askedRef.current !== DEMO_TODAY) {
+      markAsked();
+      window.setTimeout(() => setSheet({ kind: "need-ask" }), 480);
+    }
+  }
+
+  function pushLine(role: "me" | "bot", text: string, tint: string, at?: string) {
+    const id = msgId.current++;
+    setMessages((list) => [...list, { id, day: DEMO_TODAY, role, text, tint, at }]);
+  }
+
+  function speak(text: string, opts?: { source?: "home" | "tree"; chip?: boolean }) {
     const value = text.trim();
     if (!value) return;
+    const source = opts?.source ?? (viewRef.current === "tree" ? "tree" : "home");
+    const chip = opts?.chip === true;
     const vent = ventRef.current;
     const faceId = vent ? temperRef.current : faceFor(value, temperRef.current);
     const tint = faceById(faceId).tint;
-    const nextCard = vent ? null : cardFromText(value);
-    pushLine("me", value, tint);
+    const nextCard = vent || chip ? null : cardFromText(value);
+    pushLine("me", value, tint, "刚刚");
     setShown(faceId);
     setPop((n) => n + 1);
+    raiseNeed(source, value, vent);
+    const bot = source === "tree" ? asideFor(value, vent) : replyFor(value, faceId, vent);
     window.setTimeout(() => {
-      pushLine("bot", replyFor(value, faceId, vent), "#ffffff");
+      pushLine("bot", bot, "#ffffff");
       if (nextCard) {
         setCard(nextCard);
         setOffer(true);
@@ -350,6 +440,16 @@ export default function App() {
     }, 880);
   }
 
+  function acceptNeedAsk() {
+    if (!card) setCard({ ...GOLDEN_CARD });
+    setSheet({ kind: "call-confirm", enter: true });
+  }
+
+  function onNeedCard() {
+    if (scoreRef.current >= NEED_THRESHOLD) setSheet({ kind: "need-ask" });
+    else setSheet({ kind: "need-gap" });
+  }
+
   function startListen() {
     if (listenRef.current) return;
     setListening(true);
@@ -360,7 +460,7 @@ export default function App() {
       const line = HEARD[heardI.current % HEARD.length];
       heardI.current += 1;
       setListening(false);
-      speak(line);
+      speak(line, { source: viewRef.current === "tree" ? "tree" : "home" });
     }, 900);
   }
 
@@ -373,7 +473,7 @@ export default function App() {
     }
     const value = draft;
     setDraft("");
-    speak(value);
+    speak(value, { source: "home" });
   }
 
   function deliver(source: EmotionCard, status: string, meta: string, reply: string) {
@@ -511,7 +611,18 @@ export default function App() {
     setTogetherOpen(false);
     setDraft("");
     setTreeDraft("");
-    ping("演示回到开头。来电仍然关着。");
+    scoreRef.current = SEED_NEED_TODAY;
+    askedRef.current = null;
+    setNeedScore(SEED_NEED_TODAY);
+    setNeedHistory(SEED_NEED_HISTORY.map((item) => ({ ...item })));
+    setNeedChartOpen(false);
+    setAskedDay(null);
+    try {
+      localStorage.removeItem(ASK_KEY);
+    } catch {
+      /* private mode */
+    }
+    ping("演示回到开头。来电仍然关着。今天的分数回到 78。");
     goTab("home");
   }
 
@@ -585,7 +696,7 @@ export default function App() {
       <p className="stage-hint">
         间语 · 阿宁 / 小周
         <br />
-        说完先停在聊天里。想送出去，再自己点开。
+        树洞里怎么说都行。分数到了，小间才会问要不要打。
       </p>
       <div className="phone" data-temper={listening ? "listen" : shown}>
         <header className="status">
@@ -644,7 +755,7 @@ export default function App() {
               </div>
               <div className="dock-stack">
                 {messages.length === 0 ? (
-                  <button className="suggest" type="button" onClick={() => speak(GOLDEN_LINE)}>
+                  <button className="suggest" type="button" onClick={() => speak(GOLDEN_LINE, { source: "home" })}>
                     {GOLDEN_LINE}
                   </button>
                 ) : null}
@@ -735,18 +846,73 @@ export default function App() {
                   </span>
                 </button>
               </div>
-              <button
-                className="quiet-row"
-                type="button"
-                onClick={() => {
-                  if (card) setSheet({ kind: "call-confirm", enter: true });
-                  else setSheet({ kind: "demo-call" });
-                }}
-              >
-                <span className="kicker">需对方允许</span>
-                <b>小间来电</b>
-                <small>不确定就用信札。来电默认关，第一次会问。对方可以关掉，关掉就改信札，不连环打。</small>
-              </button>
+              <article className={`need-card tier-${tier.id}`} onClick={onNeedCard}>
+                <div className="need-top">
+                  <img className="need-face" alt="" src={faceById(tier.face).src} draggable={false} />
+                  <div>
+                    <div className="kicker">小间来电</div>
+                    <b className="need-tier">
+                      <i className={tier.id} />
+                      {tier.label}
+                    </b>
+                    <p className="need-line">{tier.line}</p>
+                  </div>
+                </div>
+                <div className="need-meter">
+                  <div className="need-bar" aria-hidden="true">
+                    <div className="need-fill" style={{ width: `${Math.max(0, Math.min(100, needScore))}%` }} />
+                    <i className="need-mark" style={{ left: `${NEED_THRESHOLD}%` }} />
+                  </div>
+                  <b className="need-score">
+                    {needScore}/{NEED_THRESHOLD}
+                  </b>
+                </div>
+                <button
+                  className="need-trend"
+                  type="button"
+                  aria-expanded={needChartOpen}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setNeedChartOpen((open) => !open);
+                  }}
+                >
+                  {needChartOpen ? "收起趋势" : "看趋势"}
+                </button>
+                {needChartOpen ? (
+                  <div
+                    onClick={(e) => {
+                      e.stopPropagation();
+                    }}
+                  >
+                    <NeedChart points={needHistory} />
+                    <p className="need-chart-note">近 7 日 · 横线是阈值</p>
+                  </div>
+                ) : null}
+                <div className="need-actions">
+                  <button
+                    className="need-quiet"
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openSub("tree");
+                    }}
+                  >
+                    先树洞再说
+                  </button>
+                  {needReady ? (
+                    <button
+                      className="need-go"
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSheet({ kind: "need-ask" });
+                      }}
+                    >
+                      要不要打
+                    </button>
+                  ) : null}
+                </div>
+              </article>
             </div>
           </section>
 
@@ -894,53 +1060,64 @@ export default function App() {
               <button className="linkish" type="button" onClick={resetDemo}>
                 把这条演示回到开头
               </button>
+              <button className="linkish deep-demo" type="button" onClick={() => setSheet({ kind: "demo-call" })}>
+                演示来电
+              </button>
             </div>
           </section>
 
-          <section className={view === "tree" ? "screen on" : "screen"}>
-            <header className="subhead">
+          <section className={view === "tree" ? "screen on vent-space" : "screen vent-space"}>
+            <header className="subhead vent-head">
               <button className="back" type="button" aria-label="返回" onClick={back}>
                 <IconBack />
               </button>
               <div className="subhead-text">
                 <h1>树洞</h1>
-                <p>{ventOnly ? "今天只倒苦水" : "按天记在这里"}</p>
               </div>
               <button
-                className="vent"
+                className={ventOnly ? "vent-toggle on" : "vent-toggle"}
                 type="button"
+                aria-pressed={ventOnly}
                 onClick={() => {
                   setVentOnly((v) => !v);
-                  ping(!ventOnly ? "今天只倒苦水，不会收成卡。" : "可以说。要不要让小周知道，你再定。");
+                  ping(!ventOnly ? "今天只倒，不收成卡。" : "要不要让小周知道，你再定。");
                 }}
               >
-                <span className={ventOnly ? "switch on" : "switch"}>
-                  <i />
-                </span>
-                <span>只倒苦水</span>
+                今天只倒，不收成卡
               </button>
             </header>
-            <div className="chat-log" ref={logRef}>
+            <div className={listening ? "vent-hero listening" : "vent-hero"}>
+              <div className="vent-halo" aria-hidden="true" />
+              <img className="vent-face" alt="小间在听" src="/xiaojian/listen.png" draggable={false} />
+              <p className="vent-companion">{VENT_COMPANION}</p>
+            </div>
+            <div className="vent-log" ref={logRef}>
               {treeGroups.map(([day, lines]) => (
                 <div key={day} className="day-group">
-                  <div className="day-label">
-                    {CAL_MONTH}月{day}日{day === DEMO_TODAY ? " · 今天" : ""}
-                  </div>
-                  {lines.map((m) => (
-                    <div key={m.id} className={m.role === "me" ? "bubble me" : "bubble bot"} style={m.role === "me" ? { background: m.tint } : undefined}>
-                      {m.text}
-                    </div>
-                  ))}
+                  <div className="day-label soft">{daySoftLabel(day)}</div>
+                  {lines.map((m) =>
+                    m.role === "me" ? (
+                      <article key={m.id} className="journal-card" style={{ background: m.tint }}>
+                        {m.at ? <time>{m.at}</time> : null}
+                        <p>{m.text}</p>
+                      </article>
+                    ) : (
+                      <p key={m.id} className="aside-line">
+                        <span>小间轻轻</span>
+                        {m.text}
+                      </p>
+                    ),
+                  )}
                 </div>
               ))}
-              {messages.length === 0 ? (
-                <>
-                  <p className="empty">今天还没往树洞里说。点下面这句，或在首页说。</p>
-                  <button className="suggest" type="button" onClick={() => speak(GOLDEN_LINE)}>
-                    {GOLDEN_LINE}
-                  </button>
-                </>
-              ) : null}
+              {messages.every((m) => m.role !== "me") ? <p className="vent-empty">今天还没说。点下面一句，或者直接说给小间。</p> : null}
+            </div>
+            <div className="vent-chips">
+              {VENT_CHIPS.map((chip) => (
+                <button key={chip} className="vent-chip" type="button" onClick={() => speak(chip, { source: "tree", chip: true })}>
+                  {chip}
+                </button>
+              ))}
             </div>
             {offer && card && !ventOnly && !chipHidden ? (
               <div className={chipPulse ? "chip-row tree pulse" : "chip-row tree"} key={`tree-${chipFlash}`} onAnimationEnd={() => setChipPulse(false)}>
@@ -964,20 +1141,27 @@ export default function App() {
               </div>
             ) : null}
             <form
-              className="help pad-help"
+              className={listening ? "vent-composer listening" : "vent-composer"}
               onSubmit={(e) => {
                 e.preventDefault();
+                if (listening) return;
                 if (!treeDraft.trim()) {
-                  ping("先写一句。");
+                  startListen();
                   return;
                 }
-                speak(treeDraft);
+                speak(treeDraft, { source: "tree" });
                 setTreeDraft("");
               }}
             >
-              <input value={treeDraft} placeholder="继续说给小间" onChange={(e) => setTreeDraft(e.target.value)} />
-              <button className="help-go" type="submit" aria-label="发送">
-                <IconArrow />
+              <input
+                value={treeDraft}
+                placeholder={listening ? "在听…" : "说给小间"}
+                autoComplete="off"
+                enterKeyHint="send"
+                onChange={(e) => setTreeDraft(e.target.value)}
+              />
+              <button className={listening ? "help-go hot" : "help-go"} type="submit" aria-label={treeDraft.trim() ? "发送" : "说话"}>
+                {treeDraft.trim() && !listening ? <IconArrow /> : <IconMic />}
               </button>
             </form>
           </section>
@@ -1224,7 +1408,14 @@ export default function App() {
                     <span>{playing ? "小间正在读" : "将要读的"}</span>
                     <p>{script}</p>
                   </div>
-                  <button className="cta" type="button" onClick={() => setPlaying((v) => !v)}>
+                  <button
+                    className="cta"
+                    type="button"
+                    onClick={() => {
+                      if (!playing) raiseNeed("voice");
+                      setPlaying((v) => !v);
+                    }}
+                  >
                     {playing ? "停一下" : "让小间读一遍"}
                   </button>
                   <button className="cta ghost" type="button" onClick={() => enterPreview()}>
@@ -1254,9 +1445,7 @@ export default function App() {
                 <img className="incoming-face" alt="小间" src={CALL_FACE} draggable={false} />
               </div>
               <h1>小间</h1>
-              <p className="sub">
-                有一句想说给你听
-              </p>
+              <p className="precall">{PRECALL_LINE}</p>
               <div className="incoming-actions">
                 <button className="cta" type="button" onClick={answerCall} disabled={sheet?.kind === "permit"}>
                   接通
@@ -1622,6 +1811,52 @@ export default function App() {
                     </div>
                   </>
                 ) : null}
+                {sheet.kind === "need-ask" ? (
+                  <>
+                    <p className="kicker">
+                      小间来电 · {needScore}/{NEED_THRESHOLD}
+                    </p>
+                    <h2>要不要让小间代打电话？</h2>
+                    <p className="lead">这几天的话已经攒到可以问你了。来电默认关着，第一次仍会问对方允不允许。</p>
+                    <p className="sheet-note">不答应就改成信札，不会再打。</p>
+                    <div className="sheet-actions">
+                      <button
+                        className="ghost"
+                        type="button"
+                        onClick={() => {
+                          setSheet(null);
+                          openSub("tree");
+                        }}
+                      >
+                        先树洞再说
+                      </button>
+                      <button className="cta" type="button" onClick={acceptNeedAsk}>
+                        要小间打
+                      </button>
+                    </div>
+                  </>
+                ) : null}
+                {sheet.kind === "need-gap" ? (
+                  <>
+                    <p className="kicker">
+                      {tier.label} · {needScore}/{NEED_THRESHOLD}
+                    </p>
+                    <h2>还差 {needGap} 分</h2>
+                    <p className="lead">{tier.line}。这会儿不能直接打，先在树洞说就好。</p>
+                    <div className="sheet-actions">
+                      <button
+                        className="cta"
+                        type="button"
+                        onClick={() => {
+                          setSheet(null);
+                          openSub("tree");
+                        }}
+                      >
+                        先树洞再说
+                      </button>
+                    </div>
+                  </>
+                ) : null}
                 {sheet.kind === "demo-call" ? (
                   <>
                     <h2>还没有情绪卡</h2>
@@ -1676,6 +1911,33 @@ export default function App() {
         </div>
       </div>
     </div>
+  );
+}
+
+function NeedChart({ points }: { points: { day: number; score: number }[] }) {
+  const w = 320;
+  const h = 96;
+  const padX = 18;
+  const padTop = 12;
+  const padBot = 18;
+  const innerH = h - padTop - padBot;
+  const xAt = (i: number) => (points.length <= 1 ? w / 2 : padX + (i * (w - padX * 2)) / (points.length - 1));
+  const yAt = (score: number) => padTop + (1 - Math.max(0, Math.min(100, score)) / 100) * innerH;
+  const line = points.map((p, i) => `${i === 0 ? "M" : "L"}${xAt(i).toFixed(1)},${yAt(p.score).toFixed(1)}`).join(" ");
+  const yMark = yAt(NEED_THRESHOLD);
+  return (
+    <svg className="need-chart" viewBox={`0 0 ${w} ${h}`} role="img" aria-label={`近7日需要分数，阈值 ${NEED_THRESHOLD}`}>
+      <line className="need-chart-mark" x1={padX} x2={w - padX} y1={yMark} y2={yMark} />
+      <path className="need-chart-line" d={line} />
+      {points.map((p, i) => (
+        <g key={p.day}>
+          <circle className="need-chart-dot" cx={xAt(i)} cy={yAt(p.score)} r="3.2" />
+          <text className="need-chart-label" x={xAt(i)} y={h - 4} textAnchor="middle">
+            {p.day}
+          </text>
+        </g>
+      ))}
+    </svg>
   );
 }
 

@@ -218,17 +218,95 @@ export function noteFromConvey(card: EmotionCard, reply: string): DayNote {
   };
 }
 
-export type TreeLine = { id: number; day: number; role: "me" | "bot"; text: string; tint: string };
+export type TreeLine = { id: number; day: number; role: "me" | "bot"; text: string; tint: string; at?: string };
 
 /** 演示月里已经记下的树洞。今天（15 日）从空白开始，说了才写上。 */
 export const SEED_TREE: TreeLine[] = [
-  { id: -6, day: 8, role: "me", text: "回消息有点慢，我闷了一晚上。", tint: "#E5DBFF" },
-  { id: -5, day: 8, role: "bot", text: "闷是真的。这些话先留在树洞，不用今晚谈完。", tint: "#ffffff" },
-  { id: -4, day: 14, role: "me", text: "见父母的事，我其实松了一口气。", tint: "#B2F2BB" },
-  { id: -3, day: 14, role: "bot", text: "听到了。你轻一点也可以，不用把话说满。", tint: "#ffffff" },
-  { id: -2, day: 22, role: "me", text: "周末只想待着，不想安排正事。", tint: "#FFD0E4" },
-  { id: -1, day: 22, role: "bot", text: "我在。想待着就待着，不催你。", tint: "#ffffff" },
+  { id: -6, day: 8, role: "me", text: "回消息有点慢，我闷了一晚上。", tint: "#E5DBFF", at: "夜里" },
+  { id: -5, day: 8, role: "bot", text: "我听着。", tint: "#ffffff" },
+  { id: -4, day: 14, role: "me", text: "见父母的事，我其实松了一口气。", tint: "#B2F2BB", at: "傍晚" },
+  { id: -3, day: 14, role: "bot", text: "听到了。你轻一点也可以。", tint: "#ffffff" },
+  { id: -2, day: 22, role: "me", text: "周末只想待着，不想安排正事。", tint: "#FFD0E4", at: "下午" },
+  { id: -1, day: 22, role: "bot", text: "你说，我在。", tint: "#ffffff" },
 ];
+
+/** 树洞软提示：只倒出来，不收成卡。 */
+export const VENT_CHIPS = ["有点闷", "先听听就好", "今晚先放着"] as const;
+export const VENT_COMPANION = "我在。你想怎么说都行。";
+
+export const ASIDES = ["我听着。", "这些话先放在这儿。", "不急着整理。", "你说，我在。"] as const;
+
+/** 日标签副标。今天固定写「今天」。 */
+export const DAY_SOFT: Record<number, string> = {
+  8: "那晚",
+  14: "那天",
+  22: "那个周末",
+};
+
+export function daySoftLabel(day: number): string {
+  const head = `${CAL_MONTH}月${day}日`;
+  if (day === DEMO_TODAY) return `${head} · 今天`;
+  const soft = DAY_SOFT[day];
+  return soft ? `${head} · ${soft}` : head;
+}
+
+/** 树洞旁白：一段倾诉最多一句。 */
+export function asideFor(text: string, ventOnly: boolean): string {
+  if (ventOnly || /先听听|只倒|别告诉|别转/.test(text)) return "这些话先留在这儿。";
+  if (/闷|委屈|烦|不安|不理|哭|难过|生气/.test(text)) return "我听着。";
+  if (/谢谢|好一点|开心|哈哈/.test(text)) return "听到了。你轻一点也可以。";
+  if (/听|在吗|说说/.test(text)) return "你说，我在。";
+  return ASIDES[text.length % ASIDES.length];
+}
+
+/** 来电阈值。种子今天过线，方便演示主动问一次。 */
+export const NEED_THRESHOLD = 72;
+export const SEED_NEED_TODAY = 78;
+
+export type NeedSource = "tree" | "home" | "voice";
+
+export const NEED_TIERS = [
+  { id: "calm", label: "平静", face: "calm" as FaceId, line: "还早，先树洞就好", min: 0 },
+  { id: "notice", label: "留意", face: "soft" as FaceId, line: "有一点想被听见", min: 40 },
+  { id: "near", label: "临近", face: "listen" as FaceId, line: "快到可以问你了", min: 60 },
+  { id: "ready", label: "可触发", face: "empathy" as FaceId, line: "已经攒到可以问你了", min: NEED_THRESHOLD },
+] as const;
+
+export type NeedTierId = (typeof NEED_TIERS)[number]["id"];
+
+export function tierFor(score: number) {
+  let tier: (typeof NEED_TIERS)[number] = NEED_TIERS[0];
+  for (const item of NEED_TIERS) {
+    if (score >= item.min) tier = item;
+  }
+  return tier;
+}
+
+/** 近 7 日。今天（15 日）种子 78。 */
+export const SEED_NEED_HISTORY: { day: number; score: number }[] = [
+  { day: 9, score: 28 },
+  { day: 10, score: 36 },
+  { day: 11, score: 44 },
+  { day: 12, score: 51 },
+  { day: 13, score: 58 },
+  { day: 14, score: 66 },
+  { day: DEMO_TODAY, score: SEED_NEED_TODAY },
+];
+
+/**
+ * Demo weights: tree hole high, home chat mid, voice page low.
+ * Strong feeling words and vent-only add to the tree signal.
+ */
+export function bumpNeed(score: number, source: NeedSource, text = "", ventOnly = false): number {
+  let delta = source === "tree" ? 6 : source === "home" ? 3 : 2;
+  if (source !== "voice" && /闷|委屈|烦|不安|不理|冷淡|很少回|哭|难过|生气|讨厌|指责|吵|冷战|没劲|不想/.test(text)) {
+    delta += source === "tree" ? 8 : 3;
+  }
+  if (source === "tree" && ventOnly) delta += 4;
+  return Math.max(0, Math.min(100, score + delta));
+}
+
+export const PRECALL_LINE = "小间根据你这几天的话，想帮你说清楚";
 
 export const STATE_LABEL: Record<Resolve, string> = {
   done: "已疏通",
