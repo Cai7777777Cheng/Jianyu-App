@@ -179,7 +179,7 @@ svg { display: block; }
   align-items: center;
   justify-content: center;
   gap: 3px;
-  color: #8b95a3;
+  color: #62707e;
   border-radius: 16px;
 }
 .tab-icon {
@@ -191,13 +191,11 @@ svg { display: block; }
   position: relative;
 }
 .tab-icon svg { width: 20px; height: 20px; }
-.tab-label { font-size: 10px; font-weight: 600; line-height: 1; }
-.tab-strong { color: #3d4b5c; }
+.tab-label { font-size: 11px; font-weight: 600; line-height: 1; }
+.tab-strong { color: #2c3a4a; }
 .tab-strong .tab-icon svg { width: 22px; height: 22px; }
-.tab-strong .tab-label { font-size: 11px; font-weight: 700; }
-.tab-quiet { color: #b0b7c0; }
+.tab-strong .tab-label { font-weight: 700; }
 .tab-quiet .tab-icon svg { width: 18px; height: 18px; }
-.tab-quiet .tab-label { font-weight: 500; }
 .tab.active { color: #0e3c40; }
 .tab.active .tab-icon { background: #d7f4f3; }
 .tab.active .tab-label { color: #0e3c40; font-weight: 800; font-size: 11px; }
@@ -267,7 +265,7 @@ svg { display: block; }
 .text-link {
   display: block;
   margin: 28px auto 8px;
-  color: var(--ink-mute);
+  color: #62707e;
   font-size: 13px;
   font-weight: 650;
 }
@@ -495,6 +493,10 @@ svg { display: block; }
 }
 .db-actions { display: flex; gap: 8px; margin-top: 10px; }
 .db-actions .btn { flex: 1; }
+.digest-banner .btn-primary {
+  background: var(--cta-soft);
+  color: var(--cta-deep);
+}
 
 .chat-input-bar {
   flex-shrink: 0;

@@ -291,6 +291,15 @@
       tag.className = "tag " + (done ? "tag-mute" : "tag-cyan");
     }
     if (card) card.classList.toggle("is-done", !!done);
+    refreshTodoCount();
+  }
+
+  function refreshTodoCount() {
+    const n = $all(".todo:not(.is-done)").length;
+    const count = $(".todo-count");
+    const label = $(".todo-head span");
+    if (count) count.textContent = String(n);
+    if (label) label.textContent = n ? "待你处理" : "都处理过了";
   }
 
   function openOnboarding() {
@@ -522,6 +531,7 @@
         homeTag.textContent = tag.textContent;
         homeTag.className = tag.className;
         $("#btn-home-note").classList.add("is-done");
+        refreshTodoCount();
       });
     });
 
